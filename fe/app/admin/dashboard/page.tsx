@@ -130,7 +130,7 @@ export default function AdminDashboardPage() {
           <p className="text-muted-foreground">{t("error.noData")}</p>
         </div>
       </DashboardLayout>
-    )
+  )
   }
 
   const totalTickets = stats.total_tickets
@@ -143,7 +143,7 @@ export default function AdminDashboardPage() {
     <DashboardLayout requiredRole="admin">
       <div className="space-y-6">
         {/* Header */}
-        <div>
+          <div>
           <h1 className="text-3xl font-bold tracking-tight">{t("admin.dashboard.title")}</h1>
           <p className="text-muted-foreground">{t("admin.dashboard.description")}</p>
         </div>
@@ -211,17 +211,17 @@ export default function AdminDashboardPage() {
               <CardDescription>{t("admin.dashboard.ticketStatusBreakdown")}</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+                <div className="space-y-4">
                 {Object.entries(stats.status_distribution).map(([status, count]) => (
                   <div key={status} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
                       <div className={`h-3 w-3 rounded-full ${getStatusColor(status)}`}></div>
                       <span className="text-sm font-medium">{status}</span>
-                    </div>
+                      </div>
                     <Badge variant="secondary">{count}</Badge>
-                  </div>
-                ))}
-              </div>
+                    </div>
+                  ))}
+                </div>
             </CardContent>
           </Card>
 
@@ -231,7 +231,7 @@ export default function AdminDashboardPage() {
               <CardTitle>{t("admin.dashboard.topStaff")}</CardTitle>
               <CardDescription>{t("admin.dashboard.bestPerformers")}</CardDescription>
             </CardHeader>
-                        <CardContent>
+            <CardContent>
               <div className="space-y-4">
                 {stats.top_staff.length > 0 ? (
                   stats.top_staff.map((staff, index) => (
@@ -239,19 +239,19 @@ export default function AdminDashboardPage() {
                       <div className="flex items-center space-x-3">
                         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
                           <Award className="h-4 w-4 text-primary" />
-                        </div>
+                  </div>
                         <div>
                           <p className="text-sm font-medium">{staff.Name || staff.name}</p>
                           <p className="text-xs text-muted-foreground">{staff.Email || staff.email}</p>
-                        </div>
-                      </div>
+                  </div>
+                </div>
                       <div className="text-right">
                         <p className="text-sm font-medium">{staff.Count || staff.count} {t("admin.dashboard.tickets")}</p>
                         <p className="text-xs text-muted-foreground">
                           {(staff.AvgTime || staff.avg_time) ? (staff.AvgTime || staff.avg_time).toFixed(1) : '0.0'}h {t("admin.dashboard.avg")}
                         </p>
-                      </div>
-                    </div>
+                  </div>
+                </div>
                   ))
                 ) : (
                   <div className="text-center py-4">

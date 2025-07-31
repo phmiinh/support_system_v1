@@ -349,12 +349,19 @@ class ApiClient {
   async assignTicket(id: string, staffId: number) {
     return this.request(`/admin/tickets/${id}/assign`, {
       method: "PUT",
-      body: JSON.stringify({ staff_id: staffId }),
+      body: JSON.stringify({ assigned_to: staffId }),
     })
   }
 
   async getAssignableStaff() {
     return this.request("/admin/staff")
+  }
+
+  async updateTicketStatus(ticketId: string, status: string, priorityId: number) {
+    return this.request(`/admin/tickets/${ticketId}/status`, {
+      method: "PUT",
+      body: JSON.stringify({ status, priority_id: priorityId }),
+    })
   }
 
   // Admin user management
@@ -394,58 +401,62 @@ class ApiClient {
     return this.request("/user/dashboard/stats")
   }
 
-  async getUsers(params?: any) {
-    const queryString = params ? `?${new URLSearchParams(params)}` : ""
-    return this.request(`/admin/users${queryString}`)
+  async getUsers(params?: { role?: string; keyword?: string; page?: number; limit?: number }) {
+    const searchParams = new URLSearchParams()
+    if (params?.role) searchParams.append('role', params.role)
+    if (params?.keyword) searchParams.append('keyword', params.keyword)
+    if (params?.page) searchParams.append('page', params.page.toString())
+    if (params?.limit) searchParams.append('limit', params.limit.toString())
+    
+    return this.request(`/admin/users?${searchParams.toString()}`)
   }
 
-  async createUser(data: any) {
-    return this.request("/admin/users", {
-      method: "POST",
+  async createUser(data: { name: string; email: string; phone: string; password: string; role: string }) {
+    return this.request('/admin/users', {
+      method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
-  async updateUser(id: string, data: any) {
+  async updateUser(id: string, data: { name?: string; email?: string; phone?: string; role?: string }) {
     return this.request(`/admin/users/${id}`, {
-      method: "PUT",
+      method: 'PUT',
       body: JSON.stringify(data),
     })
   }
 
   async deleteUser(id: string) {
     return this.request(`/admin/users/${id}`, {
-      method: "DELETE",
+      method: 'DELETE',
     })
   }
 
   // Knowledge base endpoints
-  async getKnowledgeBase(params?: any) {
-    const queryString = params ? `?${new URLSearchParams(params)}` : ""
-    return this.request(`/user/knowledge-base${queryString}`)
+  async getKnowledgeBase() {
+    return this.request('/user/knowledge-base')
   }
 
   async getKnowledgeBaseArticle(slug: string) {
     return this.request(`/user/knowledge-base/${slug}`)
   }
 
-  async createKnowledgeBaseArticle(data: any) {
-    return this.request("/admin/knowledge-base", {
-      method: "POST",
-      body: JSON.stringify(data),
+  async createKnowledgeBase(data: FormData) {
+    return this.request('/admin/knowledge-base', {
+      method: 'POST',
+      body: data,
     })
   }
 
-  async updateKnowledgeBaseArticle(id: string, data: any) {
+  async updateKnowledgeBase(id: string, data: FormData) {
     return this.request(`/admin/knowledge-base/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
+      method: 'PUT',
+      body: data,
     })
   }
 
-  async deleteKnowledgeBaseArticle(id: string) {
+  async deleteKnowledgeBase(id: string) {
     return this.request(`/admin/knowledge-base/${id}`, {
-      method: "DELETE",
+      method: 'DELETE',
     })
   }
 
@@ -455,7 +466,7 @@ class ApiClient {
   }
 
   async getTicketPriorities() {
-    return this.request("/ticket-priorities")
+    return this.request("/admin/ticket-priorities")
   }
 
   async getTicketProductTypes() {
@@ -485,23 +496,63 @@ class ApiClient {
   }
 
   // Admin settings
-  async createTicketCategory(data: any) {
-    return this.request("/admin/ticket-categories", {
-      method: "POST",
+  async createTicketCategory(data: { name: string }) {
+    return this.request('/admin/ticket-categories', {
+      method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
-  async updateTicketCategory(id: string, data: any) {
+  async updateTicketCategory(id: string, data: { name: string }) {
     return this.request(`/admin/ticket-categories/${id}`, {
-      method: "PUT",
+      method: 'PUT',
       body: JSON.stringify(data),
     })
   }
 
   async deleteTicketCategory(id: string) {
     return this.request(`/admin/ticket-categories/${id}`, {
-      method: "DELETE",
+      method: 'DELETE',
+    })
+  }
+
+  async createTicketProductType(data: { name: string }) {
+    return this.request('/admin/ticket-product-types', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateTicketProductType(id: string, data: { name: string }) {
+    return this.request(`/admin/ticket-product-types/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteTicketProductType(id: string) {
+    return this.request(`/admin/ticket-product-types/${id}`, {
+      method: 'DELETE',
+    })
+  }
+
+  async createTicketPriority(data: { name: string }) {
+    return this.request('/admin/ticket-priorities', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateTicketPriority(id: string, data: { name: string }) {
+    return this.request(`/admin/ticket-priorities/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteTicketPriority(id: string) {
+    return this.request(`/admin/ticket-priorities/${id}`, {
+      method: 'DELETE',
     })
   }
 }

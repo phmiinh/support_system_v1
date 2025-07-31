@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast"
 import { apiClient } from "@/lib/api"
 import { Loader2, Search, FileText, Calendar, Eye, Download } from "lucide-react"
 import Link from "next/link"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface KnowledgeBase {
   id: number
@@ -29,7 +31,7 @@ export default function KnowledgeBasePage() {
   const [documents, setDocuments] = useState<KnowledgeBase[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState("all")
   const [categories, setCategories] = useState<string[]>([])
 
   const { t } = useLanguage()
@@ -46,7 +48,7 @@ export default function KnowledgeBasePage() {
       setDocuments(response.docs || [])
       
       // Extract unique categories
-      const uniqueCategories = [...new Set(response.docs?.map((doc: KnowledgeBase) => doc.category).filter(Boolean) || [])]
+      const uniqueCategories = [...new Set(response.docs?.map((doc: KnowledgeBase) => doc.category).filter(Boolean) || [])] as string[]
       setCategories(uniqueCategories)
     } catch (error: any) {
       toast({
@@ -62,7 +64,7 @@ export default function KnowledgeBasePage() {
   const filteredDocuments = documents.filter(doc => {
     const matchesSearch = doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          doc.content.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = !selectedCategory || doc.category === selectedCategory
+    const matchesCategory = selectedCategory === "all" || doc.category === selectedCategory
     return matchesSearch && matchesCategory
   })
 
@@ -121,9 +123,9 @@ export default function KnowledgeBasePage() {
 
         {/* Search and Filter */}
         <Card>
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1 relative">
+          <CardContent className="space-y-4 pt-6">
+            <div className="flex items-center space-x-2">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
                   placeholder={t("knowledge.searchPlaceholder")}
@@ -132,19 +134,34 @@ export default function KnowledgeBasePage() {
                   className="pl-10"
                 />
               </div>
-              <div className="w-full md:w-48">
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background"
-                >
-                  <option value="">{t("knowledge.allCategories")}</option>
-                  {categories.map(category => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSearchTerm("")
+                  setSelectedCategory("all")
+                }}
+                className="whitespace-nowrap"
+              >
+                {t("common.clearFilters")}
+              </Button>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <Label>{t("knowledge.category")}:</Label>
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder={t("knowledge.allCategories")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("knowledge.allCategories")}</SelectItem>
+                    {categories.map(category => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardContent>

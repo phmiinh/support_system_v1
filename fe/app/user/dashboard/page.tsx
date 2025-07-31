@@ -103,9 +103,9 @@ export default function UserDashboard() {
             <p className="text-muted-foreground mt-1">{t("dashboard.overview")}</p>
           </div>
           <Button onClick={() => setShowCreateModal(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            {t("dashboard.createNewTicket")}
-          </Button>
+              <Plus className="mr-2 h-4 w-4" />
+              {t("dashboard.createNewTicket")}
+            </Button>
         </div>
 
         {/* Stats Cards */}

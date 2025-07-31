@@ -72,7 +72,7 @@ export default function RegisterPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">{t("auth.register")}</CardTitle>
-          <CardDescription className="text-center">Create your account to get started</CardDescription>
+          <CardDescription className="text-center">{t("auth.registerDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -87,7 +87,7 @@ export default function RegisterPage() {
                 onChange={(e) => setFullName(e.target.value)}
                 required
                 disabled={loading}
-                placeholder="Enter your full name"
+                placeholder={t("auth.fullNamePlaceholder")}
               />
             </div>
 
@@ -102,13 +102,13 @@ export default function RegisterPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={loading}
-                placeholder="Enter your email"
+                placeholder={t("auth.emailPlaceholder")}
               />
             </div>
 
             <div className="space-y-2">
               <label htmlFor="phone" className="text-sm font-medium">
-                Phone Number
+                {t("auth.phone")}
               </label>
               <Input
                 id="phone"
@@ -116,7 +116,7 @@ export default function RegisterPage() {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 disabled={loading}
-                placeholder="Enter your phone number (optional)"
+                placeholder={t("auth.phonePlaceholder")}
               />
             </div>
 
@@ -132,7 +132,7 @@ export default function RegisterPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={loading}
-                  placeholder="Enter your password"
+                  placeholder={t("auth.passwordPlaceholder")}
                   minLength={6}
                 />
                 <button
@@ -157,7 +157,7 @@ export default function RegisterPage() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   disabled={loading}
-                  placeholder="Confirm your password"
+                  placeholder={t("auth.confirmPasswordPlaceholder")}
                   minLength={6}
                 />
                 <button

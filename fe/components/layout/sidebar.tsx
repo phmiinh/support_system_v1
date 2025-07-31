@@ -13,7 +13,7 @@ import {
   Bell,
   Settings,
   Users,
-  BarChart3,
+  Tag,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -79,9 +79,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       icon: BookOpen,
     },
     {
-      title: t("nav.reports"),
-      href: "/admin/reports",
-      icon: BarChart3,
+      title: t("nav.ticketAttributes"),
+      href: "/admin/ticket-attributes",
+      icon: Tag,
     },
     {
       title: t("nav.settings"),

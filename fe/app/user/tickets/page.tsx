@@ -10,7 +10,7 @@ import { useToast } from "@/components/providers/toast-provider"
 import { apiClient } from "@/lib/api"
 import { formatDate, getStatusColor, getPriorityColor } from "@/lib/utils"
 import { CreateTicketModal } from "@/components/ui/create-ticket-modal"
-import { Plus, Search, Eye, Edit, Trash2 } from "lucide-react"
+import { Plus, Search, Eye, Trash2 } from "lucide-react"
 import Link from "next/link"
 
 interface Ticket {
@@ -85,8 +85,8 @@ export default function UserTicketsPage() {
       if (searchTerm) params.search = searchTerm
       if (statusFilter) params.status = statusFilter
       if (priorityFilter) params.priority = priorityFilter
-      if (categoryFilter) params.category_id = categoryFilter
-      if (productTypeFilter) params.product_type_id = productTypeFilter
+      if (categoryFilter) params.category = categoryFilter
+      if (productTypeFilter) params.product_type = productTypeFilter
       if (fromDateFilter) params.from_date = fromDateFilter
       if (toDateFilter) params.to_date = toDateFilter
       params.page = pagination.page
@@ -168,9 +168,9 @@ export default function UserTicketsPage() {
             <p className="text-muted-foreground mt-1">{t("tickets.manageRequests")}</p>
           </div>
           <Button onClick={() => setShowCreateModal(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            {t("tickets.newTicket")}
-          </Button>
+              <Plus className="mr-2 h-4 w-4" />
+              {t("tickets.newTicket")}
+            </Button>
         </div>
 
         {/* Filters */}
@@ -178,12 +178,13 @@ export default function UserTicketsPage() {
           <CardContent className="p-6">
             <div className="space-y-4">
               {/* Search Bar */}
-              <div className="relative">
-                <Search
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
-                  size={20}
-                />
-                                  <Input
+              <div className="flex items-center space-x-2">
+                <div className="relative flex-1">
+                  <Search
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
+                    size={20}
+                  />
+                  <Input
                     placeholder={t("common.search")}
                     value={searchTerm}
                     onChange={(e) => {
@@ -192,28 +193,45 @@ export default function UserTicketsPage() {
                     }}
                     className="pl-10"
                   />
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearchTerm("")
+                    setStatusFilter("")
+                    setPriorityFilter("")
+                    setCategoryFilter("")
+                    setProductTypeFilter("")
+                    setFromDateFilter("")
+                    setToDateFilter("")
+                    handleFilterChange()
+                  }}
+                  className="whitespace-nowrap"
+                >
+                  {t("tickets.clearFilters")}
+                </Button>
               </div>
               
               {/* Filter Row 1 */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <select
-                  value={statusFilter}
+              <select
+                value={statusFilter}
                   onChange={(e) => {
                     setStatusFilter(e.target.value)
                     handleFilterChange()
                   }}
-                  className="px-3 py-2 border border-input rounded-md bg-background"
-                >
+                className="px-3 py-2 border border-input rounded-md bg-background"
+              >
                   <option value="">Tất cả trạng thái</option>
                   <option value="Mới">Mới</option>
                   <option value="Đang xử lý">Đang xử lý</option>
                   <option value="Chờ phản hồi">Chờ phản hồi</option>
                   <option value="Đã xử lý">Đã xử lý</option>
                   <option value="Đã đóng">Đã đóng</option>
-                </select>
+              </select>
                 
-                <select
-                  value={priorityFilter}
+              <select
+                value={priorityFilter}
                   onChange={(e) => {
                     setPriorityFilter(e.target.value)
                     handleFilterChange()
@@ -249,15 +267,15 @@ export default function UserTicketsPage() {
                     setProductTypeFilter(e.target.value)
                     handleFilterChange()
                   }}
-                  className="px-3 py-2 border border-input rounded-md bg-background"
-                >
+                className="px-3 py-2 border border-input rounded-md bg-background"
+              >
                   <option value="">Tất cả loại sản phẩm</option>
                   {productTypes.map((productType) => (
                     <option key={productType.id} value={productType.name}>
                       {productType.name}
                     </option>
                   ))}
-                </select>
+              </select>
               </div>
               
               {/* Filter Row 2 - Date Range */}
@@ -344,21 +362,14 @@ export default function UserTicketsPage() {
                           </Button>
                         </Link>
                         {ticket.status === "new" && (
-                          <>
-                            <Link href={`/user/tickets/${String(ticket.id)}/edit`}>
-                              <Button variant="outline" size="sm">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </Link>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteTicket(String(ticket.id))}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteTicket(String(ticket.id))}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         )}
                       </div>
                     </div>

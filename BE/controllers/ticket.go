@@ -128,6 +128,7 @@ func GetMyTickets(c *fiber.Ctx) error {
 	priority := c.Query("priority")
 	priorityID := c.Query("priority_id")
 	categoryID := c.Query("category_id")
+	category := c.Query("category")
 	productType := c.Query("product_type")
 	productTypeID := c.Query("product_type_id")
 	search := c.Query("search")
@@ -168,6 +169,8 @@ func GetMyTickets(c *fiber.Ctx) error {
 		if id, err := strconv.Atoi(categoryID); err == nil {
 			query = query.Where("category_id = ?", id)
 		}
+	} else if category != "" && category != "Tất cả" {
+		query = query.Joins("JOIN ticket_categories ON tickets.category_id = ticket_categories.id").Where("ticket_categories.name = ?", category)
 	}
 	if productTypeID != "" {
 		if id, err := strconv.Atoi(productTypeID); err == nil {
@@ -213,6 +216,8 @@ func GetMyTickets(c *fiber.Ctx) error {
 		if id, err := strconv.Atoi(categoryID); err == nil {
 			countQuery = countQuery.Where("category_id = ?", id)
 		}
+	} else if category != "" && category != "Tất cả" {
+		countQuery = countQuery.Joins("JOIN ticket_categories ON tickets.category_id = ticket_categories.id").Where("ticket_categories.name = ?", category)
 	}
 	if productTypeID != "" {
 		if id, err := strconv.Atoi(productTypeID); err == nil {
@@ -581,6 +586,7 @@ func AdminGetTickets(c *fiber.Ctx) error {
 	priority := c.Query("priority")
 	priorityID := c.Query("priority_id")
 	categoryID := c.Query("category_id")
+	category := c.Query("category")
 	productType := c.Query("product_type")
 	productTypeID := c.Query("product_type_id")
 	assignedTo := c.Query("assigned_to")
@@ -615,6 +621,8 @@ func AdminGetTickets(c *fiber.Ctx) error {
 		if id, err := strconv.Atoi(categoryID); err == nil {
 			query = query.Where("category_id = ?", id)
 		}
+	} else if category != "" && category != "Tất cả" {
+		query = query.Joins("JOIN ticket_categories ON tickets.category_id = ticket_categories.id").Where("ticket_categories.name = ?", category)
 	}
 	if productTypeID != "" {
 		if id, err := strconv.Atoi(productTypeID); err == nil {
@@ -662,6 +670,8 @@ func AdminGetTickets(c *fiber.Ctx) error {
 		if id, err := strconv.Atoi(categoryID); err == nil {
 			countQuery = countQuery.Where("category_id = ?", id)
 		}
+	} else if category != "" && category != "Tất cả" {
+		countQuery = countQuery.Joins("JOIN ticket_categories ON tickets.category_id = ticket_categories.id").Where("ticket_categories.name = ?", category)
 	}
 	if productTypeID != "" {
 		if id, err := strconv.Atoi(productTypeID); err == nil {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,6 +28,7 @@ interface KnowledgeBase {
 export default function KnowledgeBaseDetailPage() {
   const [document, setDocument] = useState<KnowledgeBase | null>(null)
   const [loading, setLoading] = useState(true)
+  const hasFetchedRef = useRef(false)
   const params = useParams()
   const slug = params.slug as string
 
@@ -35,7 +36,8 @@ export default function KnowledgeBaseDetailPage() {
   const { toast } = useToast()
 
   useEffect(() => {
-    if (slug) {
+    if (slug && !hasFetchedRef.current) {
+      hasFetchedRef.current = true
       fetchDocument()
     }
   }, [slug])

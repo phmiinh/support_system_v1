@@ -99,7 +99,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">{t("auth.login")}</CardTitle>
-          <CardDescription className="text-center">Enter your credentials to access your account</CardDescription>
+          <CardDescription className="text-center">{t("auth.loginDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -114,7 +114,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={loading}
-                placeholder="Enter your email"
+                placeholder={t("auth.emailPlaceholder")}
               />
             </div>
 
@@ -130,7 +130,7 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={loading}
-                  placeholder="Enter your password"
+                  placeholder={t("auth.passwordPlaceholder")}
                 />
                 <button
                   type="button"

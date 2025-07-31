@@ -134,13 +134,13 @@ export default function TicketDetailPage() {
       addToast({
         type: "success",
         title: t("common.success"),
-        message: "Bình luận đã được thêm thành công",
+        message: "Phản hồi đã được thêm thành công",
       })
     } catch (error: any) {
       addToast({
         type: "error",
         title: t("common.error"),
-        message: error.message || "Không thể thêm bình luận",
+        message: error.message || "Không thể thêm phản hồi",
       })
     } finally {
       setSubmittingComment(false)
@@ -252,8 +252,7 @@ export default function TicketDetailPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-3xl font-bold">#{String(ticket.id).slice(-8)}</h1>
-              <p className="text-muted-foreground mt-1">{ticket.title}</p>
+              <h1 className="text-4xl font-bold">{t("tickets.detail")} #{String(ticket.id).slice(-8)}</h1>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -282,8 +281,7 @@ export default function TicketDetailPage() {
         {/* Ticket Details */}
         <Card>
           <CardHeader>
-            <CardTitle>{t("tickets.details")}</CardTitle>
-            <CardDescription>{t("tickets.completeInfo")}</CardDescription>
+            <CardTitle className="text-3xl font-bold">{ticket.title}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Status and Priority */}
@@ -363,7 +361,7 @@ export default function TicketDetailPage() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <MessageCircle className="mr-2 h-5 w-5" />
-              {t("tickets.comments")} ({comments.length})
+              {t("tickets.feedback")} ({comments.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
