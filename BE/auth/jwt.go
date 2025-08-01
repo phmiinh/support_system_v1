@@ -19,10 +19,11 @@ func getJWTSecret() []byte {
 var jwtSecret = getJWTSecret()
 
 // Access token (hạn 15 phút)
-func GenerateAccessToken(userID uint) (string, error) {
+func GenerateAccessToken(userID uint, role string) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": userID,
-		"exp":     time.Now().Add(15 * time.Minute).Unix(),
+		"role":    role,
+		"exp":     time.Now().Add(2 * time.Minute).Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -30,9 +31,10 @@ func GenerateAccessToken(userID uint) (string, error) {
 }
 
 // Refresh token (hạn 7 ngày)
-func GenerateRefreshToken(userID uint) (string, error) {
+func GenerateRefreshToken(userID uint, role string) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": userID,
+		"role":    role,
 		"exp":     time.Now().Add(7 * 24 * time.Hour).Unix(),
 	}
 

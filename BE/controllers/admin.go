@@ -14,19 +14,37 @@ import (
 
 // AdminDashboardStats trả về thống kê tổng quan cho dashboard
 func AdminDashboardStats(c *fiber.Ctx) error {
+	user := c.Locals("user").(models.User)
+	userRole := c.Locals("userRole").(string)
+
 	var totalTickets int64
 	var processingTickets int64
 	var avgProcessingTime float64
 
+	// Base query - filter by role
+	baseQuery := models.DB.Model(&models.Ticket{})
+	if userRole == "staff" {
+		baseQuery = baseQuery.Where("assigned_to = ?", user.ID)
+	}
+
 	// Đếm tổng số ticket
-	models.DB.Model(&models.Ticket{}).Count(&totalTickets)
+	baseQuery.Count(&totalTickets)
 
 	// Đếm ticket đang xử lý
-	models.DB.Model(&models.Ticket{}).Where("status IN ('Mới', 'Đang xử lý', 'Chờ phản hồi')").Count(&processingTickets)
+	processingQuery := models.DB.Model(&models.Ticket{}).Where("status IN ('Mới', 'Đang xử lý', 'Chờ phản hồi')")
+	if userRole == "staff" {
+		processingQuery = processingQuery.Where("assigned_to = ?", user.ID)
+	}
+	processingQuery.Count(&processingTickets)
 
 	// Tính thời gian xử lý trung bình (chỉ tính các ticket đã xử lý)
+	completedQuery := models.DB.Where("status = 'Đã xử lý' AND resolved_at IS NOT NULL")
+	if userRole == "staff" {
+		completedQuery = completedQuery.Where("assigned_to = ?", user.ID)
+	}
+
 	var completedTickets []models.Ticket
-	models.DB.Where("status = 'Đã xử lý' AND resolved_at IS NOT NULL").Find(&completedTickets)
+	completedQuery.Find(&completedTickets)
 
 	var totalProcessingTime time.Duration
 	for _, ticket := range completedTickets {
@@ -41,11 +59,26 @@ func AdminDashboardStats(c *fiber.Ctx) error {
 
 	// Thống kê theo trạng thái
 	statusStats := fiber.Map{}
-	rows, _ := models.DB.Raw(`
-		SELECT status, COUNT(*) as count 
-		FROM tickets 
-		GROUP BY status
-	`).Rows()
+	var statusQuery string
+	var statusArgs []interface{}
+
+	if userRole == "staff" {
+		statusQuery = `
+			SELECT status, COUNT(*) as count 
+			FROM tickets 
+			WHERE assigned_to = ?
+			GROUP BY status
+		`
+		statusArgs = []interface{}{user.ID}
+	} else {
+		statusQuery = `
+			SELECT status, COUNT(*) as count 
+			FROM tickets 
+			GROUP BY status
+		`
+	}
+
+	rows, _ := models.DB.Raw(statusQuery, statusArgs...).Rows()
 	defer rows.Close()
 
 	for rows.Next() {
@@ -59,13 +92,22 @@ func AdminDashboardStats(c *fiber.Ctx) error {
 	now := time.Now()
 	firstOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 	var ticketsThisMonth int64
-	models.DB.Model(&models.Ticket{}).Where("created_at >= ?", firstOfMonth).Count(&ticketsThisMonth)
+
+	monthlyQuery := models.DB.Model(&models.Ticket{}).Where("created_at >= ?", firstOfMonth)
+	if userRole == "staff" {
+		monthlyQuery = monthlyQuery.Where("assigned_to = ?", user.ID)
+	}
+	monthlyQuery.Count(&ticketsThisMonth)
 
 	// Thống kê số ticket đã xử lý trong tháng
 	var ticketsResolvedThisMonth int64
-	models.DB.Model(&models.Ticket{}).Where("status = 'Đã xử lý' AND resolved_at >= ?", firstOfMonth).Count(&ticketsResolvedThisMonth)
+	resolvedMonthlyQuery := models.DB.Model(&models.Ticket{}).Where("status = 'Đã xử lý' AND resolved_at >= ?", firstOfMonth)
+	if userRole == "staff" {
+		resolvedMonthlyQuery = resolvedMonthlyQuery.Where("assigned_to = ?", user.ID)
+	}
+	resolvedMonthlyQuery.Count(&ticketsResolvedThisMonth)
 
-	// Thống kê nhân viên xuất sắc (xử lý nhiều nhất trong tháng)
+	// Thống kê nhân viên xuất sắc (xử lý nhiều nhất all time)
 	type StaffStat struct {
 		StaffID uint
 		Name    string
@@ -75,24 +117,66 @@ func AdminDashboardStats(c *fiber.Ctx) error {
 	}
 	var staffStats []StaffStat
 
-	// Lấy tất cả nhân viên (admin và staff) và thống kê ticket của họ
-	models.DB.Raw(`
-		SELECT 
-			users.id as staff_id, 
-			users.name, 
-			users.email, 
-			COALESCE(COUNT(tickets.id), 0) as count,
-			COALESCE(AVG(TIMESTAMPDIFF(SECOND, tickets.created_at, tickets.resolved_at))/3600, 0) as avg_time
-		FROM users 
-		LEFT JOIN tickets ON users.id = tickets.assigned_to 
-			AND tickets.status = 'Đã xử lý' 
-			AND tickets.resolved_at >= ? 
-			AND tickets.assigned_to IS NOT NULL
-		WHERE users.role IN ('admin', 'staff')
-		GROUP BY users.id, users.name, users.email
-		ORDER BY count DESC, avg_time ASC
-		LIMIT 5
-	`, firstOfMonth).Scan(&staffStats)
+	// Lấy tất cả nhân viên (admin và staff) và thống kê ticket của họ (all time)
+	var staffQuery string
+	var staffArgs []interface{}
+
+	if userRole == "staff" {
+		// Staff chỉ thấy thống kê của chính mình
+		staffQuery = `
+			SELECT 
+				users.id as staff_id, 
+				users.name, 
+				users.email, 
+				COALESCE(COUNT(tickets.id), 0) as count,
+				COALESCE(AVG(CASE 
+					WHEN tickets.status = 'Đã xử lý' AND tickets.resolved_at IS NOT NULL 
+					THEN TIMESTAMPDIFF(SECOND, tickets.created_at, tickets.resolved_at)/3600 
+					ELSE NULL 
+				END), 0) as avg_time
+			FROM users 
+			LEFT JOIN tickets ON users.id = tickets.assigned_to 
+			WHERE users.id = ? AND users.role IN ('admin', 'staff')
+			GROUP BY users.id, users.name, users.email
+			ORDER BY count DESC, avg_time ASC
+		`
+		staffArgs = []interface{}{user.ID}
+	} else {
+		// Admin thấy tất cả staff
+		staffQuery = `
+			SELECT 
+				users.id as staff_id, 
+				users.name, 
+				users.email, 
+				COALESCE(COUNT(tickets.id), 0) as count,
+				COALESCE(AVG(CASE 
+					WHEN tickets.status = 'Đã xử lý' AND tickets.resolved_at IS NOT NULL 
+					THEN TIMESTAMPDIFF(SECOND, tickets.created_at, tickets.resolved_at)/3600 
+					ELSE NULL 
+				END), 0) as avg_time
+			FROM users 
+			LEFT JOIN tickets ON users.id = tickets.assigned_to 
+			WHERE users.role IN ('admin', 'staff')
+			GROUP BY users.id, users.name, users.email
+			ORDER BY count DESC, avg_time ASC
+			LIMIT 5
+		`
+	}
+
+	models.DB.Raw(staffQuery, staffArgs...).Scan(&staffStats)
+
+	// Tính tỷ lệ giải quyết all time
+	var totalResolvedTickets int64
+	resolutionQuery := models.DB.Model(&models.Ticket{}).Where("status = 'Đã xử lý'")
+	if userRole == "staff" {
+		resolutionQuery = resolutionQuery.Where("assigned_to = ?", user.ID)
+	}
+	resolutionQuery.Count(&totalResolvedTickets)
+
+	resolutionRate := float64(0)
+	if totalTickets > 0 {
+		resolutionRate = (float64(totalResolvedTickets) / float64(totalTickets)) * 100
+	}
 
 	return c.JSON(fiber.Map{
 		"success": true,
@@ -104,6 +188,7 @@ func AdminDashboardStats(c *fiber.Ctx) error {
 			"tickets_this_month":          ticketsThisMonth,
 			"tickets_resolved_this_month": ticketsResolvedThisMonth,
 			"top_staff":                   staffStats,
+			"resolution_rate":             resolutionRate,
 		},
 	})
 }

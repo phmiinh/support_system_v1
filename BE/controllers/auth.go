@@ -149,7 +149,7 @@ func Login(c *fiber.Ctx) error {
 		})
 	}
 
-	accessToken, err := auth.GenerateAccessToken(user.ID)
+	accessToken, err := auth.GenerateAccessToken(user.ID, user.Role)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Không thể tạo access token.",
@@ -157,7 +157,7 @@ func Login(c *fiber.Ctx) error {
 		})
 	}
 
-	refreshToken, err := auth.GenerateRefreshToken(user.ID)
+	refreshToken, err := auth.GenerateRefreshToken(user.ID, user.Role)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Không thể tạo refresh token.",
@@ -172,19 +172,27 @@ func Login(c *fiber.Ctx) error {
 		HTTPOnly: true,
 		Path:     "/",
 		MaxAge:   7 * 24 * 3600,
-		SameSite: "Lax",       // Use Lax for localhost
-		Secure:   false,       // Set to false for localhost
-		Domain:   "localhost", // Explicitly set domain
+		SameSite: "Lax",
+		Secure:   false,
+		Domain:   "", // Let browser set domain automatically
 	})
 
-	fmt.Printf("Login: Set refresh_token cookie: %s\n", refreshToken)
+	// Set access token in HttpOnly cookie
+	c.Cookie(&fiber.Cookie{
+		Name:     "access_token",
+		Value:    accessToken,
+		HTTPOnly: true,
+		Path:     "/",
+		MaxAge:   15 * 60, // 15 minutes
+		SameSite: "Lax",
+		Secure:   false,
+		Domain:   "", // Let browser set domain automatically
+	})
 
 	// Trả về JSON thành công thay vì Redirect
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message":      "Đăng nhập thành công!",
-		"success":      true,
-		"accessToken":  accessToken,
-		"refreshToken": refreshToken,
+		"message": "Đăng nhập thành công!",
+		"success": true,
 		"user": fiber.Map{
 			"id":                 user.ID,
 			"name":               user.Name,
@@ -215,7 +223,17 @@ func RefreshToken(c *fiber.Ctx) error {
 	}
 
 	userID := uint(claims["user_id"].(float64))
-	newAccess, err := auth.GenerateAccessToken(userID)
+
+	// Lấy user để có role
+	var user models.User
+	if err := models.DB.First(&user, userID).Error; err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Không tìm thấy người dùng.",
+			"success": false,
+		})
+	}
+
+	newAccess, err := auth.GenerateAccessToken(userID, user.Role)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Không thể tạo access token mới.",
@@ -223,24 +241,45 @@ func RefreshToken(c *fiber.Ctx) error {
 		})
 	}
 
-	// Don't set access token in cookie - it will be returned in JSON for localStorage
+	// Set new access token in HttpOnly cookie
+	c.Cookie(&fiber.Cookie{
+		Name:     "access_token",
+		Value:    newAccess,
+		HTTPOnly: true,
+		Path:     "/",
+		MaxAge:   15 * 60, // 15 minutes
+		SameSite: "Lax",
+		Secure:   false,
+		Domain:   "", // Let browser set domain automatically
+	})
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message":     "Đã cấp lại access token mới!",
-		"success":     true,
-		"accessToken": newAccess,
+		"message": "Đã cấp lại access token mới!",
+		"success": true,
 	})
 }
 
 // Logout clears user cookies and logs them out.
 func Logout(c *fiber.Ctx) error {
+	// Clear refresh token cookie
 	c.Cookie(&fiber.Cookie{
 		Name:     "refresh_token",
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
-		SameSite: "Lax", // Use Lax for localhost
-		Secure:   false, // Set to false for localhost
+		SameSite: "Lax",
+		Secure:   false,
+		HTTPOnly: true,
+	})
+
+	// Clear access token cookie
+	c.Cookie(&fiber.Cookie{
+		Name:     "access_token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		SameSite: "Lax",
+		Secure:   false,
 		HTTPOnly: true,
 	})
 
@@ -322,11 +361,11 @@ func Login2FA(c *fiber.Ctx) error {
 	if !totp.Validate(input.Code, user.TwoFactorSecret) {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Mã xác thực 2FA không đúng.", "success": false})
 	}
-	accessToken, err := auth.GenerateAccessToken(user.ID)
+	accessToken, err := auth.GenerateAccessToken(user.ID, user.Role)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Không thể tạo access token.", "success": false})
 	}
-	refreshToken, err := auth.GenerateRefreshToken(user.ID)
+	refreshToken, err := auth.GenerateRefreshToken(user.ID, user.Role)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Không thể tạo refresh token.", "success": false})
 	}
@@ -503,5 +542,20 @@ func ResetPassword(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Đặt lại mật khẩu thành công!",
 		"success": true,
+	})
+}
+
+// TestAuth endpoint để kiểm tra authentication
+func TestAuth(c *fiber.Ctx) error {
+	user := c.Locals("user").(models.User)
+	return c.JSON(fiber.Map{
+		"message": "Authentication working!",
+		"success": true,
+		"user": fiber.Map{
+			"id":    user.ID,
+			"name":  user.Name,
+			"email": user.Email,
+			"role":  user.Role,
+		},
 	})
 }

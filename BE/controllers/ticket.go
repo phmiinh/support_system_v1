@@ -524,6 +524,23 @@ func PostTicketComment(c *fiber.Ctx) error {
 			}
 			models.DB.Create(&n)
 		}
+
+		// Nếu staff comment, gửi notification cho admin
+		if user.Role == "staff" {
+			var admins []models.User
+			models.DB.Where("role = ?", "admin").Find(&admins)
+			for _, admin := range admins {
+				if admin.ID != user.ID {
+					n := models.Notification{
+						UserID:  admin.ID,
+						Type:    "ticket_comment",
+						Content: fmt.Sprintf("Staff %s vừa bình luận trên ticket #%d: %s", user.Name, ticket.ID, ticket.Title),
+						Data:    fmt.Sprintf(`{"ticket_id":%d,"comment_id":%d}`, ticket.ID, comment.ID),
+					}
+					models.DB.Create(&n)
+				}
+			}
+		}
 	}
 
 	return c.JSON(fiber.Map{"success": true, "comment": comment})
@@ -582,6 +599,9 @@ func AssignTicket(c *fiber.Ctx) error {
 
 // AdminGetTickets - Lấy danh sách ticket cho admin với tìm kiếm, lọc và phân trang
 func AdminGetTickets(c *fiber.Ctx) error {
+	user := c.Locals("user").(models.User)
+	userRole := c.Locals("userRole").(string)
+
 	status := c.Query("status")
 	priority := c.Query("priority")
 	priorityID := c.Query("priority_id")
@@ -605,6 +625,11 @@ func AdminGetTickets(c *fiber.Ctx) error {
 
 	var tickets []models.Ticket
 	query := models.DB.Preload("User").Preload("Assigned").Preload("Category").Preload("Priority").Preload("ProductType")
+
+	// Filter by role - staff only sees assigned tickets
+	if userRole == "staff" {
+		query = query.Where("assigned_to = ?", user.ID)
+	}
 
 	// Apply filters
 	if status != "" && status != "Tất cả" {
@@ -656,6 +681,12 @@ func AdminGetTickets(c *fiber.Ctx) error {
 	// Count total for pagination
 	total := int64(0)
 	countQuery := models.DB.Model(&models.Ticket{})
+
+	// Apply same role filter to count query
+	if userRole == "staff" {
+		countQuery = countQuery.Where("assigned_to = ?", user.ID)
+	}
+
 	if status != "" && status != "Tất cả" {
 		countQuery = countQuery.Where("status = ?", status)
 	}
@@ -864,28 +895,55 @@ func DeleteMyTicket(c *fiber.Ctx) error {
 // Lấy notification cho admin
 func AdminGetNotifications(c *fiber.Ctx) error {
 	user := c.Locals("user").(models.User)
-	if user.Role != "admin" {
-		return c.Status(403).JSON(fiber.Map{"error": "Chỉ admin mới xem được thông báo"})
-	}
+	userRole := c.Locals("userRole").(string)
+
 	var notifs []models.Notification
-	models.DB.Where("user_id = ?", user.ID).Order("created_at DESC").Limit(50).Find(&notifs)
+
+	if userRole == "staff" {
+		// Staff chỉ thấy notifications liên quan đến tickets được assign cho họ
+		models.DB.Raw(`
+			SELECT n.* FROM notifications n
+			JOIN tickets t ON JSON_EXTRACT(n.data, '$.ticket_id') = t.id
+			WHERE t.assigned_to = ? AND n.user_id = ?
+			ORDER BY n.created_at DESC
+			LIMIT 50
+		`, user.ID, user.ID).Scan(&notifs)
+	} else {
+		// Admin thấy tất cả notifications
+		models.DB.Where("user_id = ?", user.ID).Order("created_at DESC").Limit(50).Find(&notifs)
+	}
+
 	return c.JSON(fiber.Map{"notifications": notifs})
 }
 
 // Đánh dấu đã đọc notification cho admin
 func AdminReadNotification(c *fiber.Ctx) error {
 	user := c.Locals("user").(models.User)
-	if user.Role != "admin" {
-		return c.Status(403).JSON(fiber.Map{"error": "Chỉ admin mới thao tác được"})
-	}
+	userRole := c.Locals("userRole").(string)
+
 	notifID := c.Params("id")
 	var notif models.Notification
 	if err := models.DB.First(&notif, notifID).Error; err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Không tìm thấy thông báo"})
 	}
-	if notif.UserID != user.ID {
+
+	// Kiểm tra quyền truy cập notification
+	if userRole == "staff" {
+		// Staff chỉ có thể đọc notifications liên quan đến tickets được assign cho họ
+		var ticketID uint
+		if err := json.Unmarshal([]byte(notif.Data), &fiber.Map{"ticket_id": &ticketID}); err == nil {
+			var ticket models.Ticket
+			if err := models.DB.First(&ticket, ticketID).Error; err != nil {
+				return c.Status(403).JSON(fiber.Map{"error": "Không có quyền với thông báo này"})
+			}
+			if ticket.AssignedTo == nil || *ticket.AssignedTo != user.ID {
+				return c.Status(403).JSON(fiber.Map{"error": "Không có quyền với thông báo này"})
+			}
+		}
+	} else if notif.UserID != user.ID {
 		return c.Status(403).JSON(fiber.Map{"error": "Không có quyền với thông báo này"})
 	}
+
 	notif.IsRead = true
 	if err := models.DB.Save(&notif).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Không thể cập nhật thông báo"})

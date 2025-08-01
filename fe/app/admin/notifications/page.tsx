@@ -26,7 +26,7 @@ interface Notification {
   data?: string
 }
 
-export default function NotificationsPage() {
+export default function AdminNotificationsPage() {
   const { user } = useAuth()
   const { t, language } = useLanguage()
   const { toast } = useToast()
@@ -40,7 +40,7 @@ export default function NotificationsPage() {
     
     try {
       setLoading(true)
-      const response = await apiClient.getNotifications()
+      const response = await apiClient.getAdminNotifications() as any
       setNotifications(response.notifications || [])
     } catch (error) {
       console.error("Failed to fetch notifications:", error)
@@ -57,7 +57,7 @@ export default function NotificationsPage() {
   const markAsRead = async (id: number) => {
     try {
       setMarkingAsRead(id)
-      await apiClient.markNotificationAsRead(id.toString())
+      await apiClient.markAdminNotificationAsRead(id.toString())
       setNotifications(prev => 
         prev.map(n => n.id === id ? { ...n, is_read: true } : n)
       )
@@ -84,7 +84,7 @@ export default function NotificationsPage() {
     try {
       setMarkingAsRead(-1) // Special value for "all"
       await Promise.all(
-        unreadNotifications.map(n => apiClient.markNotificationAsRead(n.id.toString()))
+        unreadNotifications.map(n => apiClient.markAdminNotificationAsRead(n.id.toString()))
       )
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
       toast({
@@ -153,7 +153,7 @@ export default function NotificationsPage() {
   const handleNotificationClick = (notification: Notification) => {
     const ticketId = getTicketIdFromNotification(notification)
     if (ticketId && (notification.type.startsWith('ticket_'))) {
-      router.push(`/user/tickets/${ticketId}`)
+      router.push(`/admin/tickets/${ticketId}`)
     }
   }
 
@@ -164,7 +164,7 @@ export default function NotificationsPage() {
   const unreadCount = notifications.filter(n => !n.is_read).length
 
   return (
-    <DashboardLayout requiredRole="user">
+    <DashboardLayout requiredRole="admin">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">

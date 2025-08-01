@@ -47,12 +47,14 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
     
     try {
       setLoading(true)
-      const response = await apiClient.getNotifications()
-      const notifs = response.notifications || []
+      const response = user.role === 'admin' 
+        ? await apiClient.getAdminNotifications()
+        : await apiClient.getNotifications()
+      const notifs = (response as any).notifications || []
       setNotifications(notifs)
       setUnreadCount(notifs.filter((n: Notification) => !n.is_read).length)
     } catch (error) {
-      console.error("Failed to fetch notifications:", error)
+      // Silent error handling
     } finally {
       setLoading(false)
     }
@@ -60,13 +62,36 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
 
   const markAsRead = async (id: number) => {
     try {
-      await apiClient.markNotificationAsRead(id.toString())
+      if (user?.role === 'admin') {
+        await apiClient.markAdminNotificationAsRead(id.toString())
+      } else {
+        await apiClient.markNotificationAsRead(id.toString())
+      }
       setNotifications(prev => 
         prev.map(n => n.id === id ? { ...n, is_read: true } : n)
       )
       setUnreadCount(prev => Math.max(0, prev - 1))
     } catch (error) {
-      console.error("Failed to mark notification as read:", error)
+      // Silent error handling
+    }
+  }
+
+  const markAllAsRead = async () => {
+    try {
+      const unreadNotifications = notifications.filter(n => !n.is_read)
+      await Promise.all(
+        unreadNotifications.map(n => 
+          user?.role === 'admin' 
+            ? apiClient.markAdminNotificationAsRead(n.id.toString())
+            : apiClient.markNotificationAsRead(n.id.toString())
+        )
+      )
+      setNotifications(prev => 
+        prev.map(n => ({ ...n, is_read: true }))
+      )
+      setUnreadCount(0)
+    } catch (error) {
+      // Silent error handling
     }
   }
 
@@ -111,7 +136,7 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
       const data = JSON.parse(notification.data)
       return data.ticket_id || null
     } catch (error) {
-      console.error("Failed to parse notification data:", error)
+      // Silent error handling
       return null
     }
   }
@@ -120,8 +145,28 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
   const handleNotificationClick = (notification: Notification) => {
     const ticketId = getTicketIdFromNotification(notification)
     if (ticketId && (notification.type.startsWith('ticket_'))) {
-      router.push(`/user/tickets/${ticketId}`)
+      // Mark as read first
+      markAsRead(notification.id)
+      
+      // Navigate to appropriate ticket detail page based on user role
+      if (user?.role === 'admin') {
+        router.push(`/admin/tickets/${ticketId}`)
+      } else {
+        router.push(`/user/tickets/${ticketId}`)
+      }
     }
+    // For non-ticket notifications, don't navigate, just mark as read
+  }
+
+  const handleMarkAsRead = async (notification: Notification, event?: React.MouseEvent) => {
+    if (event) {
+      event.stopPropagation() // Prevent triggering the parent click
+    }
+    await markAsRead(notification.id)
+  }
+
+  const getNotificationsPageUrl = () => {
+    return user?.role === 'admin' ? '/admin/notifications' : '/user/notifications'
   }
 
   useEffect(() => {
@@ -168,7 +213,7 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  onClick={() => router.push("/user/notifications")}
+                  onClick={() => router.push(getNotificationsPageUrl())}
                 >
                   {t("notifications.viewAll")}
                 </Button>
@@ -183,52 +228,77 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
                   {t("notifications.noNotifications")}
                 </div>
               ) : (
-                notifications.slice(0, 10).map((notification) => {
-                  const ticketId = getTicketIdFromNotification(notification)
-                  const isTicketNotification = notification.type.startsWith('ticket_')
-                  const isClickable = isTicketNotification && ticketId
+                <>
+                  {notifications.slice(0, 10).map((notification) => {
+                    const ticketId = getTicketIdFromNotification(notification)
+                    const isTicketNotification = notification.type.startsWith('ticket_')
+                    const isClickable = isTicketNotification && ticketId
+                    
+                    return (
+                      <DropdownMenuItem
+                        key={notification.id}
+                        className={cn(
+                          "flex items-start space-x-3 p-3 cursor-pointer relative",
+                          !notification.is_read && "bg-muted/50"
+                        )}
+                        onClick={() => {
+                          if (isClickable) {
+                            handleNotificationClick(notification)
+                          }
+                        }}
+                      >
+                        <div className="mt-0.5">
+                          {getNotificationIcon(notification.type)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <Badge variant="secondary" className="text-xs">
+                              {getNotificationTypeLabel(notification.type)}
+                            </Badge>
+                            {!notification.is_read && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-xs"
+                                onClick={(e) => handleMarkAsRead(notification, e)}
+                                title={t("notifications.markAsRead")}
+                              >
+                                <Check className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                          <p className={cn(
+                            "text-sm",
+                            !notification.is_read && "font-medium"
+                          )}>
+                            {notification.content}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatNotificationTime(notification.created_at)}
+                          </p>
+                        </div>
+                        {!notification.is_read && (
+                          <div className="w-2 h-2 bg-primary rounded-full mt-1" />
+                        )}
+                      </DropdownMenuItem>
+                    )
+                  })}
                   
-                  return (
-                    <DropdownMenuItem
-                      key={notification.id}
-                      className={cn(
-                        "flex items-start space-x-3 p-3 cursor-pointer",
-                        !notification.is_read && "bg-muted/50"
-                      )}
-                      onClick={() => {
-                        if (isClickable) {
-                          handleNotificationClick(notification)
-                        } else {
-                          markAsRead(notification.id)
-                        }
-                      }}
-                    >
-                    <div className="mt-0.5">
-                      {getNotificationIcon(notification.type)}
+                  {/* Mark all as read button at bottom */}
+                  {unreadCount > 0 && (
+                    <div className="border-t p-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={markAllAsRead}
+                        className="w-full text-xs"
+                      >
+                        {t("notifications.markAllAsRead")}
+                      </Button>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <Badge variant="secondary" className="text-xs">
-                          {getNotificationTypeLabel(notification.type)}
-                        </Badge>
-                      </div>
-                      <p className={cn(
-                        "text-sm",
-                        !notification.is_read && "font-medium"
-                      )}>
-                        {notification.content}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {formatNotificationTime(notification.created_at)}
-                      </p>
-                    </div>
-                    {!notification.is_read && (
-                      <div className="w-2 h-2 bg-primary rounded-full mt-1" />
-                    )}
-                  </DropdownMenuItem>
-                )
-              })
-            )}
+                  )}
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -245,7 +315,12 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
               </div>
               <div className="hidden md:block">
                 <p className="text-sm font-medium">{user.fullName || user.email || 'User'}</p>
-                <p className="text-xs text-muted-foreground capitalize">{user.role || 'user'}</p>
+                <p className="text-xs text-muted-foreground">
+                  {user.originalRole === 'customer' ? 'Customer' : 
+                   user.originalRole === 'staff' ? 'Staff' : 
+                   user.originalRole === 'admin' ? 'Admin' : 
+                   user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'User'}
+                </p>
               </div>
             </div>
           )}

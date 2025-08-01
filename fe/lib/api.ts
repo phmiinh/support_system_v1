@@ -19,23 +19,9 @@ class ApiClient {
 
   // Check if token is expired or will expire soon
   private isTokenExpired(): boolean {
-    const token = typeof window !== 'undefined' ? localStorage.getItem("accessToken") : null
-    if (!token) return true
-    
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]))
-      const exp = payload.exp * 1000 // Convert to milliseconds
-      const now = Date.now()
-      const timeUntilExpiry = exp - now
-      
-      console.log(`Token expires in ${Math.round(timeUntilExpiry / 1000)} seconds`)
-      
-      // Refresh if token expires in next 30 seconds
-      return now >= (exp - 30000)
-    } catch (error) {
-      console.error("Failed to parse token:", error)
-      return true
-    }
+    // Since tokens are now in HttpOnly cookies, we can't check expiration from frontend
+    // The backend will handle token validation and refresh
+    return false
   }
 
   // Refresh token function
@@ -59,16 +45,10 @@ class ApiClient {
 
   private async performRefresh(): Promise<string> {
     try {
-      console.log("Attempting to refresh token...")
-      console.log("Refresh URL:", `${this.baseURL}/refresh-token`)
-      
       const response = await fetch(`${this.baseURL}/refresh-token`, {
         method: "POST",
         credentials: 'include' as RequestCredentials,
       })
-
-      console.log("Refresh response status:", response.status)
-      console.log("Refresh response headers:", Object.fromEntries(response.headers.entries()))
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -78,22 +58,14 @@ class ApiClient {
       }
 
       const responseData = await response.json()
-      console.log("Refresh response data:", responseData)
       
-      const { accessToken } = responseData
-      console.log("Token refreshed successfully")
-      
-      // Store access token in localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem("accessToken", accessToken)
-      }
-
-      return accessToken
+      // Since tokens are in cookies, we don't need to store them in localStorage
+      // Just return a dummy token for compatibility
+      return "cookie-based-token"
     } catch (error) {
       console.error("Refresh token error:", error)
-      // Clear token and redirect to login
+      // Clear any stored tokens and redirect to login
       if (typeof window !== 'undefined') {
-        localStorage.removeItem("accessToken")
         window.location.href = "/login"
       }
       throw error
@@ -103,21 +75,6 @@ class ApiClient {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseURL}${endpoint}`
 
-    // Check if token is expired and refresh if needed
-    if (this.isTokenExpired()) {
-      try {
-        await this.refreshToken()
-      } catch (error) {
-        // If refresh fails, redirect to login
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem("accessToken")
-          window.location.href = "/login"
-        }
-        throw new Error("Authentication failed")
-      }
-    }
-
-    const token = typeof window !== 'undefined' ? localStorage.getItem("accessToken") : null
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string> || {}),
     }
@@ -125,10 +82,6 @@ class ApiClient {
     // Only set Content-Type for JSON requests
     if (!(options.body instanceof FormData)) {
       headers["Content-Type"] = "application/json"
-    }
-
-    if (token) {
-      headers.Authorization = `Bearer ${token}`
     }
 
     try {
@@ -143,14 +96,20 @@ class ApiClient {
         requestOptions.body = JSON.stringify(options.body)
       }
       
+      console.log(`API Request: ${options.method || 'GET'} ${url}`)
+      console.log('Headers:', headers)
+      
       const response = await fetch(url, requestOptions)
 
+      console.log(`API Response: ${response.status} ${response.statusText}`)
+
       if (response.status === 401) {
+        console.log("401 Unauthorized - attempting token refresh")
         // Try to refresh token and retry once
         try {
-          const newToken = await this.refreshToken()
-          headers.Authorization = `Bearer ${newToken}`
+          await this.refreshToken()
           
+          console.log("Retrying request after token refresh")
           const retryResponse = await fetch(url, {
             ...options,
             headers,
@@ -158,14 +117,15 @@ class ApiClient {
           })
 
           if (!retryResponse.ok) {
+            console.error(`Retry failed: ${retryResponse.status}`)
             throw new Error(`HTTP error! status: ${retryResponse.status}`)
           }
 
           return retryResponse.json()
         } catch (refreshError) {
+          console.error("Token refresh failed:", refreshError)
           // Refresh failed, redirect to login
           if (typeof window !== 'undefined') {
-            localStorage.removeItem("accessToken")
             window.location.href = "/login"
           }
           throw new Error("Authentication failed")
@@ -174,7 +134,13 @@ class ApiClient {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        console.error("API Error:", response.status, errorData) // Debug
+        console.error("API Error:", errorData)
+        
+        if (response.status === 403) {
+          console.error("Access Denied:", errorData)
+          throw new Error(errorData.message || "Bạn không có quyền truy cập trang này")
+        }
+        
         throw new Error(errorData.message || errorData.error || `HTTP error! status: ${response.status}`)
       }
 
@@ -292,7 +258,7 @@ class ApiClient {
   }
 
   async updateTicket(id: string, data: any) {
-    console.log("API: Updating ticket", id, data) // Debug
+
     return this.request(`/user/tickets/${id}`, {
       method: "PUT",
       body: data,
@@ -300,7 +266,7 @@ class ApiClient {
   }
 
   async deleteTicket(id: string) {
-    console.log("API: Deleting ticket", id) // Debug
+
     return this.request(`/user/tickets/${id}`, {
       method: "DELETE",
     })
@@ -440,6 +406,18 @@ class ApiClient {
     return this.request(`/user/knowledge-base/${slug}`)
   }
 
+  async getAdminKnowledgeBase(params?: any) {
+    const queryParams = new URLSearchParams()
+    if (params?.search) queryParams.append('search', params.search)
+    if (params?.category) queryParams.append('category', params.category)
+    if (params?.page) queryParams.append('page', params.page.toString())
+    if (params?.pageSize) queryParams.append('pageSize', params.pageSize.toString())
+    
+    const queryString = queryParams.toString()
+    const url = `/admin/knowledge-base${queryString ? `?${queryString}` : ''}`
+    return this.request(url)
+  }
+
   async createKnowledgeBase(data: FormData) {
     return this.request('/admin/knowledge-base', {
       method: 'POST',
@@ -466,7 +444,7 @@ class ApiClient {
   }
 
   async getTicketPriorities() {
-    return this.request("/admin/ticket-priorities")
+    return this.request("/ticket-priorities")
   }
 
   async getTicketProductTypes() {
@@ -486,12 +464,12 @@ class ApiClient {
 
   // Admin notification endpoints
   async getAdminNotifications() {
-    return this.request("/admin/notifications")
+    return this.request('/admin/notifications')
   }
 
   async markAdminNotificationAsRead(id: string) {
     return this.request(`/admin/notifications/${id}/read`, {
-      method: "POST",
+      method: 'POST',
     })
   }
 

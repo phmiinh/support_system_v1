@@ -27,12 +27,13 @@ interface DashboardStats {
   status_distribution: Record<string, number>
   tickets_this_month: number
   tickets_resolved_this_month: number
+  resolution_rate: number
   top_staff: Array<{
-    staff_id: number
-    name: string
-    email: string
-    count: number
-    avg_time: number | null
+    StaffID: number
+    Name: string
+    Email: string
+    Count: number
+    AvgTime: number
   }>
 }
 
@@ -50,8 +51,6 @@ export default function AdminDashboardPage() {
     try {
       setLoading(true)
       const response = await apiClient.getAdminDashboardStats()
-      console.log('Admin Dashboard Response:', response)
-      console.log('Top Staff Data:', response.stats.top_staff)
       setStats(response.stats as DashboardStats)
     } catch (error) {
       console.error("Failed to fetch admin stats:", error)
@@ -137,7 +136,7 @@ export default function AdminDashboardPage() {
   const processingTickets = stats.processing_tickets
   const resolvedThisMonth = stats.tickets_resolved_this_month
   const totalThisMonth = stats.tickets_this_month
-  const resolutionRate = totalThisMonth > 0 ? (resolvedThisMonth / totalThisMonth) * 100 : 0
+  const resolutionRate = stats.resolution_rate
 
   return (
     <DashboardLayout requiredRole="admin">
@@ -195,9 +194,9 @@ export default function AdminDashboardPage() {
               <CheckCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{resolutionRate.toFixed(1)}%</div>
+              <div className="text-2xl font-bold">{(resolutionRate || 0).toFixed(1)}%</div>
               <p className="text-xs text-muted-foreground">
-                {t("admin.dashboard.thisMonth")}
+                {t("admin.dashboard.allTime")}
               </p>
             </CardContent>
           </Card>
@@ -229,26 +228,26 @@ export default function AdminDashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle>{t("admin.dashboard.topStaff")}</CardTitle>
-              <CardDescription>{t("admin.dashboard.bestPerformers")}</CardDescription>
+              <CardDescription>{t("admin.dashboard.allTimeBestPerformers")}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {stats.top_staff.length > 0 ? (
+                {stats.top_staff && stats.top_staff.length > 0 ? (
                   stats.top_staff.map((staff, index) => (
-                    <div key={staff.StaffID || staff.staff_id} className="flex items-center justify-between">
+                    <div key={staff.StaffID} className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
                           <Award className="h-4 w-4 text-primary" />
                   </div>
                         <div>
-                          <p className="text-sm font-medium">{staff.Name || staff.name}</p>
-                          <p className="text-xs text-muted-foreground">{staff.Email || staff.email}</p>
+                          <p className="text-sm font-medium">{staff.Name}</p>
+                          <p className="text-xs text-muted-foreground">{staff.Email}</p>
                   </div>
                 </div>
                       <div className="text-right">
-                        <p className="text-sm font-medium">{staff.Count || staff.count} {t("admin.dashboard.tickets")}</p>
+                        <p className="text-sm font-medium">{staff.Count} {t("admin.dashboard.tickets")}</p>
                         <p className="text-xs text-muted-foreground">
-                          {(staff.AvgTime || staff.avg_time) ? (staff.AvgTime || staff.avg_time).toFixed(1) : '0.0'}h {t("admin.dashboard.avg")}
+                          {staff.AvgTime ? staff.AvgTime.toFixed(1) : '0.0'}h {t("admin.dashboard.avg")}
                         </p>
                   </div>
                 </div>
@@ -281,7 +280,7 @@ export default function AdminDashboardPage() {
                 <p className="text-sm text-muted-foreground">{t("admin.dashboard.resolvedTickets")}</p>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">{totalThisMonth - resolvedThisMonth}</div>
+                <div className="text-2xl font-bold text-orange-600">{stats.processing_tickets}</div>
                 <p className="text-sm text-muted-foreground">{t("admin.dashboard.pendingTickets")}</p>
               </div>
             </div>

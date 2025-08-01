@@ -9,6 +9,7 @@ type User = {
   email: string
   fullName: string
   role: "user" | "admin"
+  originalRole?: string
   isEmailVerified: boolean
   is2FAEnabled: boolean
 }
@@ -37,34 +38,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     // Set up automatic token refresh
     const setupAutoRefresh = () => {
-      const token = localStorage.getItem("accessToken")
-      if (!token) return
-      
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]))
-        const exp = payload.exp * 1000 // Convert to milliseconds
-        const now = Date.now()
-        const timeUntilExpiry = exp - now - 30000 // Refresh 30 seconds before expiry
-        
-        if (timeUntilExpiry > 0) {
-          setTimeout(async () => {
-            try {
-              await refreshToken()
-            } catch (error) {
-              console.error("Auto refresh failed:", error)
-              logout()
-            }
-          }, timeUntilExpiry)
+      // Since tokens are in HttpOnly cookies, we can't check expiration from frontend
+      // The backend will handle token validation and refresh automatically
+      // We'll just try to refresh every 14 minutes (before 15-minute expiry)
+      setTimeout(async () => {
+        try {
+          await refreshToken()
+        } catch (error) {
+          console.error("Auto refresh failed:", error)
+          logout()
         }
-      } catch (error) {
-        console.error("Failed to parse token:", error)
-      }
+      }, 14 * 60 * 1000) // 14 minutes
     }
     
     setupAutoRefresh()
     
-    // Check every minute for token expiry
-    const interval = setInterval(setupAutoRefresh, 60000)
+    // Check every 14 minutes for token refresh
+    const interval = setInterval(setupAutoRefresh, 14 * 60 * 1000)
     
     return () => clearInterval(interval)
   }, [])
@@ -72,17 +62,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkAuth = async () => {
     try {
       console.log("AuthProvider: Checking authentication...")
-      const token = localStorage.getItem("accessToken")
-      if (!token) {
-        console.log("AuthProvider: No access token found in localStorage")
-        setLoading(false)
-        return
-      }
-
+      
+      // Since tokens are in HttpOnly cookies, we can't check them from frontend
+      // Just try to get user profile to check if authenticated
       const response = await fetch(`${API_BASE_URL}/user/profile`, {
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
         },
         credentials: 'include' as RequestCredentials,
       })
@@ -99,20 +84,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: backendUser.id?.toString() || '',
           email: backendUser.email || '',
           fullName: backendUser.name || backendUser.fullName || '',
-          role: backendUser.role === 'customer' ? 'user' : backendUser.role || 'user',
-          isEmailVerified: backendUser.is_verified || backendUser.isEmailVerified || false,
-          is2FAEnabled: backendUser.two_factor_enabled || backendUser.is2FAEnabled || false,
+          role: (backendUser.role === 'customer' || backendUser.role === 'staff') ? 'user' : backendUser.role || 'user',
+          originalRole: backendUser.role,
+          isEmailVerified: backendUser.is_verified || false,
+          is2FAEnabled: backendUser.two_factor_enabled || false,
         }
-        console.log("AuthProvider: Setting user:", mappedUser)
+        console.log("AuthProvider: Setting user from profile:", mappedUser)
         setUser(mappedUser)
       } else {
-        console.log("AuthProvider: Profile request failed")
-        localStorage.removeItem("accessToken")
+        console.log("AuthProvider: Not authenticated")
         setUser(null)
       }
     } catch (error) {
-      console.error("AuthProvider: Auth check failed:", error)
-      localStorage.removeItem("accessToken")
+      console.error("AuthProvider: Check auth error:", error)
       setUser(null)
     } finally {
       setLoading(false)
@@ -132,6 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password,
           twoFactorCode,
         }),
+        credentials: 'include' as RequestCredentials,
       })
 
       console.log("AuthProvider: Login response status:", response.status)
@@ -146,15 +131,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error("2FA_REQUIRED")
       }
 
-      // Store access token in localStorage
-      localStorage.setItem("accessToken", data.accessToken)
+      // Tokens are now stored in HttpOnly cookies, no need to store in localStorage
 
       // Map backend user data to frontend format
       const mappedUser = {
         id: data.user.id?.toString() || '',
         email: data.user.email || '',
         fullName: data.user.name || data.user.fullName || '',
-        role: data.user.role === 'customer' ? 'user' : data.user.role || 'user',
+        role: (data.user.role === 'customer' || data.user.role === 'staff') ? 'user' : data.user.role || 'user',
+        originalRole: data.user.role, // Add originalRole
         isEmailVerified: data.user.is_verified || false,
         is2FAEnabled: data.user.two_factor_enabled || false,
       }
@@ -162,7 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(mappedUser)
 
       // Redirect based on role
-      if (data.user.role === "admin") {
+      if (data.user.role === "admin" || data.user.role === "staff") {
         console.log("AuthProvider: Redirecting to admin dashboard")
         router.push("/admin/dashboard")
       } else {
@@ -203,13 +188,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: data.user.email || '',
         fullName: data.user.name || data.user.fullName || '',
         role: data.user.role === 'customer' ? 'user' : data.user.role || 'user',
+        originalRole: data.user.role, // Add originalRole
         isEmailVerified: data.user.is_verified || false,
         is2FAEnabled: data.user.two_factor_enabled || false,
       }
       setUser(mappedUser)
 
       // Redirect based on role
-      if (data.user.role === "admin") {
+      if (data.user.role === "admin" || data.user.role === "staff") {
         router.push("/admin/dashboard")
       } else {
         router.push("/user/dashboard")
@@ -247,7 +233,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const logout = () => {
-    localStorage.removeItem("accessToken")
+    // Call backend logout endpoint to clear cookies
+    fetch(`${API_BASE_URL}/user/logout`, {
+      method: "POST",
+      credentials: 'include' as RequestCredentials,
+    }).catch(error => {
+      console.error("Logout error:", error)
+    })
+    
     setUser(null)
     router.push("/login")
   }
@@ -272,10 +265,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = await response.json()
       console.log("AuthProvider: Refresh response data:", data)
 
-      // Store access token in localStorage
-      localStorage.setItem("accessToken", data.accessToken)
+      // Tokens are now stored in HttpOnly cookies, no need to store in localStorage
       console.log("AuthProvider: Token refreshed successfully")
-      return data.accessToken
     } catch (error) {
       console.error("AuthProvider: Refresh token error:", error)
       logout()

@@ -17,15 +17,24 @@ func JWTMiddleware(c *fiber.Ctx) error {
 	} else {
 		// Fallback to cookies
 		token = c.Cookies("access_token")
+		if token == "" {
+			token = c.Cookies("refresh_token") // Try refresh token as fallback
+		}
 	}
 
 	if token == "" {
-		return c.Status(fiber.StatusUnauthorized).SendString("Unauthorized")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Unauthorized - No token provided",
+			"success": false,
+		})
 	}
 
 	claims, err := auth.ParseToken(token)
 	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).SendString("Token không hợp lệ hoặc đã hết hạn")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Token không hợp lệ hoặc đã hết hạn",
+			"success": false,
+		})
 	}
 
 	userID := uint(claims["user_id"].(float64))
@@ -34,7 +43,10 @@ func JWTMiddleware(c *fiber.Ctx) error {
 	// Lấy đầy đủ thông tin user từ DB và set vào context
 	var user models.User
 	if err := models.DB.First(&user, userID).Error; err != nil {
-		return c.Status(fiber.StatusUnauthorized).SendString("User not found")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "User not found",
+			"success": false,
+		})
 	}
 	c.Locals("user", user)
 	return c.Next()

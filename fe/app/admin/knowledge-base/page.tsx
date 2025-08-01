@@ -77,7 +77,7 @@ export default function AdminKnowledgeBasePage() {
   const fetchDocuments = async () => {
     try {
       setLoading(true)
-      const response = await apiClient.getKnowledgeBase({
+      const response = await apiClient.getAdminKnowledgeBase({
         search: searchTerm,
         category: categoryFilter === "all" ? "" : categoryFilter,
         page: currentPage,

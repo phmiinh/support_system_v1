@@ -29,6 +29,7 @@ func AdminMiddleware(c *fiber.Ctx) error {
 
 	// Parse token
 	claims, err := auth.ParseToken(token)
+
 	if err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"message": "Token không hợp lệ",
@@ -36,9 +37,19 @@ func AdminMiddleware(c *fiber.Ctx) error {
 		})
 	}
 
-	// Lấy user ID từ token
+	// Lấy user ID và role từ token
 	userID := uint(claims["user_id"].(float64))
-	// Kiểm tra user trong database
+	role := claims["role"].(string)
+
+	// Kiểm tra role
+	if role != "admin" && role != "staff" {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"message": "Không có quyền truy cập trang quản trị",
+			"success": false,
+		})
+	}
+
+	// Kiểm tra user trong database để đảm bảo user vẫn tồn tại
 	var user models.User
 	if err := models.DB.First(&user, userID).Error; err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -47,17 +58,24 @@ func AdminMiddleware(c *fiber.Ctx) error {
 		})
 	}
 
-	// Kiểm tra role
-	if user.Role != "admin" && user.Role != "staff" {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"message": "Không có quyền truy cập trang quản trị",
-			"success": false,
-		})
-	}
-
 	// Lưu thông tin user vào context để sử dụng sau
 	c.Locals("user", user)
 	c.Locals("userID", userID)
+	c.Locals("userRole", role)
+
+	return c.Next()
+}
+
+// StaffRestrictedMiddleware chặn quyền truy cập của staff vào các trang quản lý
+func StaffRestrictedMiddleware(c *fiber.Ctx) error {
+	userRole := c.Locals("userRole").(string)
+
+	if userRole == "staff" {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"message": "Bạn không có quyền truy cập trang này",
+			"success": false,
+		})
+	}
 
 	return c.Next()
 }

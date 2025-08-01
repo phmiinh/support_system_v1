@@ -79,6 +79,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       icon: BookOpen,
     },
     {
+      title: t("nav.notifications"),
+      href: "/admin/notifications",
+      icon: Bell,
+    },
+    {
       title: t("nav.ticketAttributes"),
       href: "/admin/ticket-attributes",
       icon: Tag,
@@ -90,7 +95,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     },
   ]
 
-  const menuItems = user?.role === "admin" ? adminMenuItems : userMenuItems
+  const menuItems = (user?.role === "admin" || user?.originalRole === "staff") ? adminMenuItems : userMenuItems
 
   return (
     <div

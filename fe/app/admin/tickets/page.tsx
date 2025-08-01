@@ -126,8 +126,23 @@ export default function AdminTicketsPage() {
       if (response.pagination) {
         setPagination(response.pagination)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to fetch tickets:", error)
+      
+      // Handle 403 Access Denied specifically
+      if (error.message && error.message.includes("không có quyền")) {
+        toast({
+          title: t("error.title"),
+          description: error.message,
+          variant: "destructive",
+        })
+        // Redirect to dashboard after showing error
+        setTimeout(() => {
+          window.location.href = "/admin/dashboard"
+        }, 2000)
+        return
+      }
+      
       toast({
         title: t("error.title"),
         description: t("error.failedToLoad"),

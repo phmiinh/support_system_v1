@@ -27,7 +27,20 @@ export function DashboardLayout({ children, requiredRole }: DashboardLayoutProps
       }
 
       if (requiredRole && user.role !== requiredRole) {
-        if (user.role === "admin") {
+        // Staff should be able to access admin pages but not user pages
+        if (user.originalRole === "staff" && requiredRole === "admin") {
+          // Allow staff to access admin pages
+          return
+        }
+        
+        // Block staff from accessing user pages
+        if (user.originalRole === "staff" && requiredRole === "user") {
+          router.push("/admin/dashboard")
+          return
+        }
+        
+        // Default redirect logic
+        if (user.role === "admin" || user.originalRole === "staff") {
           router.push("/admin/dashboard")
         } else {
           router.push("/user/dashboard")
