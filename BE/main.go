@@ -5,6 +5,7 @@ import (
 	"awesomeProject/models"
 	"awesomeProject/server"
 	"log"
+	"os"
 
 	"github.com/joho/godotenv"
 )
@@ -16,5 +17,13 @@ func main() {
 	models.ConnectDatabase()
 	app := server.NewServer()
 	background.StartBackgroundJobs()
-	log.Fatal(app.Listen(":8080"))
+
+	// Get port from environment variable
+	port := os.Getenv("APP_PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("Server starting on port %s", port)
+	log.Fatal(app.Listen(":" + port))
 }

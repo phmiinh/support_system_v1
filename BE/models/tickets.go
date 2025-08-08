@@ -10,18 +10,18 @@ type Ticket struct {
 	User                User              `gorm:"foreignKey:UserID" json:"-"`
 	Title               string            `gorm:"type:varchar(255);not null" json:"title"`
 	Description         string            `gorm:"type:text" json:"description"`
-	CategoryID          uint              `json:"category_id"`
+	CategoryID          uint              `gorm:"index" json:"category_id"`
 	Category            TicketCategory    `gorm:"foreignKey:CategoryID" json:"category"`
-	Status              string            `gorm:"type:enum('Mới','Đang xử lý','Chờ phản hồi','Đã xử lý','Đã đóng');default:'Mới'" json:"status"`
+	Status              string            `gorm:"type:enum('Mới','Đang xử lý','Chờ phản hồi','Đã xử lý','Đã đóng');default:'Mới';index" json:"status"`
 	PriorityID          uint              `json:"priority_id"`
 	Priority            TicketPriority    `gorm:"foreignKey:PriorityID" json:"priority"`
-	ProductTypeID       uint              `json:"product_type_id"`
+	ProductTypeID       uint              `gorm:"index" json:"product_type_id"`
 	ProductType         TicketProductType `gorm:"foreignKey:ProductTypeID" json:"product_type"`
 	AssignedTo          *uint             `gorm:"index" json:"assigned_to"`
 	Assigned            *User             `gorm:"foreignKey:AssignedTo" json:"-"`
-	CreatedAt           time.Time         `gorm:"autoCreateTime" json:"created_at"`
+	CreatedAt           time.Time         `gorm:"autoCreateTime;index" json:"created_at"`
 	UpdatedAt           time.Time         `gorm:"autoUpdateTime" json:"updated_at"`
-	ResolvedAt          *time.Time        `gorm:"default:null" json:"resolved_at"`
+	ResolvedAt          *time.Time        `gorm:"default:null;index" json:"resolved_at"`
 	AttachmentPath      string            `gorm:"type:varchar(255);default:null" json:"attachment_path"`
 	LastViewedCommentAt *time.Time        `gorm:"default:null" json:"last_viewed_comment_at"`
 }

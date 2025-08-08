@@ -12,7 +12,7 @@ import { useToast } from "@/components/providers/toast-provider"
 import { ThemeToggle } from "@/components/common/theme-toggle"
 import { LanguageToggle } from "@/components/common/language-toggle"
 import { EmailVerificationModal } from "@/components/ui/email-verification-modal"
-import { Eye, EyeOff, Loader2 } from "lucide-react"
+import { Eye, EyeOff, Loader2, Info } from "lucide-react"
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState("")
@@ -36,7 +36,7 @@ export default function RegisterPage() {
       addToast({
         type: "error",
         title: t("common.error"),
-        message: "Passwords do not match",
+        message: t("validation.password.match"),
       })
       return
     }
@@ -44,18 +44,29 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
-      await register(fullName, email, password, phone)
+      // Get current language
+      const currentLang = localStorage.getItem('language') || 'vi'
+      
+      // Create form data with language
+      const formData = new FormData()
+      formData.append('name', fullName)
+      formData.append('email', email)
+      formData.append('password', password)
+      formData.append('phone', phone)
+      formData.append('language', currentLang)
+
+      await register(formData)
       setShowVerificationModal(true)
       addToast({
         type: "success",
         title: t("common.success"),
-        message: "Registration successful! Please verify your email.",
+        message: t("auth.verificationEmailSent"),
       })
     } catch (error: any) {
       addToast({
         type: "error",
         title: t("common.error"),
-        message: error.message || "Registration failed",
+        message: error.message || t("auth.registerError"),
       })
     } finally {
       setLoading(false)
@@ -88,7 +99,15 @@ export default function RegisterPage() {
                 required
                 disabled={loading}
                 placeholder={t("auth.fullNamePlaceholder")}
+                minLength={6}
+                maxLength={20}
               />
+              <div className="flex items-start space-x-2 text-xs text-muted-foreground">
+                <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p>• {t("validation.fullName.length")}</p>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -104,6 +123,10 @@ export default function RegisterPage() {
                 disabled={loading}
                 placeholder={t("auth.emailPlaceholder")}
               />
+              <div className="flex items-start space-x-2 text-xs text-muted-foreground">
+                <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                <p>• {t("validation.email.format")}</p>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -133,7 +156,8 @@ export default function RegisterPage() {
                   required
                   disabled={loading}
                   placeholder={t("auth.passwordPlaceholder")}
-                  minLength={6}
+                  minLength={8}
+                  maxLength={24}
                 />
                 <button
                   type="button"
@@ -142,6 +166,14 @@ export default function RegisterPage() {
                 >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
+              </div>
+              <div className="flex items-start space-x-2 text-xs text-muted-foreground">
+                <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p>• {t("validation.password.length")}</p>
+                  <p>• {t("validation.password.complexity")}</p>
+                  <p>• {t("validation.password.special")}</p>
+                </div>
               </div>
             </div>
 
@@ -158,7 +190,8 @@ export default function RegisterPage() {
                   required
                   disabled={loading}
                   placeholder={t("auth.confirmPasswordPlaceholder")}
-                  minLength={6}
+                  minLength={8}
+                  maxLength={24}
                 />
                 <button
                   type="button"

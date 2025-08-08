@@ -11,33 +11,39 @@ import { useToast } from "@/components/providers/toast-provider"
 import { ThemeToggle } from "@/components/common/theme-toggle"
 import { LanguageToggle } from "@/components/common/language-toggle"
 import { apiClient } from "@/lib/api"
-import { Loader2, ArrowLeft } from "lucide-react"
+import { Loader2, ArrowLeft, Mail } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
 
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { addToast } = useToast()
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
     try {
-      await apiClient.forgotPassword(email)
+      await apiClient.forgotPassword(email, language)
       setSent(true)
       addToast({
         type: "success",
         title: t("common.success"),
-        message: "Password reset link has been sent to your email",
+        message: t("auth.resetPasswordEmailSent"),
       })
+      // Redirect to verify code page after a short delay
+      setTimeout(() => {
+        router.push(`/verify-reset-code?email=${encodeURIComponent(email)}`)
+      }, 2000)
     } catch (error: any) {
       addToast({
         type: "error",
         title: t("common.error"),
-        message: error.message || "Failed to send reset email",
+        message: error.message || t("auth.resetPasswordError"),
       })
     } finally {
       setLoading(false)
@@ -55,7 +61,7 @@ export default function ForgotPasswordPage() {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">{t("auth.forgotPassword")}</CardTitle>
           <CardDescription className="text-center">
-            {sent ? "Check your email for reset instructions" : "Enter your email to reset your password"}
+            {sent ? t("auth.checkEmailForReset") : t("auth.enterEmailToReset")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -72,29 +78,25 @@ export default function ForgotPasswordPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   disabled={loading}
-                  placeholder="Enter your email"
+                  placeholder={t("auth.emailPlaceholder")}
                 />
               </div>
 
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Send Reset Link
+                {t("auth.sendResetLink")}
               </Button>
             </form>
           ) : (
             <div className="text-center space-y-4">
               <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mx-auto">
-                <svg
-                  className="w-8 h-8 text-green-600 dark:text-green-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
+                <Mail className="w-8 h-8 text-green-600 dark:text-green-400" />
               </div>
               <p className="text-sm text-muted-foreground">
-                We've sent a password reset link to <strong>{email}</strong>
+                {t("auth.resetEmailSentTo")} <strong>{email}</strong>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {t("auth.checkSpamFolder")}
               </p>
             </div>
           )}
@@ -102,7 +104,7 @@ export default function ForgotPasswordPage() {
           <div className="mt-6 text-center">
             <Link href="/login" className="inline-flex items-center text-sm text-primary hover:underline">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to login
+              {t("auth.backToLogin")}
             </Link>
           </div>
         </CardContent>

@@ -195,8 +195,8 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
           {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell size={20} />
+          <Button variant="ghost" size="icon" className="relative">
+            <Bell size={20} />
                 {unreadCount > 0 && (
                   <Badge 
                     variant="destructive" 
@@ -264,7 +264,7 @@ export function Header({ sidebarCollapsed }: HeaderProps) {
                                 title={t("notifications.markAsRead")}
                               >
                                 <Check className="h-3 w-3" />
-                              </Button>
+          </Button>
                             )}
                           </div>
                           <p className={cn(

@@ -16,6 +16,7 @@ func RegisterAPIRoutes(app *fiber.App) {
 	app.Post("/verify-email", controllers.VerifyEmail)
 	app.Post("/resend-verification-email", controllers.ResendVerificationEmail)
 	app.Post("/forgot-password", controllers.ForgotPassword)
+	app.Post("/verify-reset-code", controllers.VerifyResetCode)
 	app.Post("/reset-password", controllers.ResetPassword)
 
 	//User routes

@@ -12,6 +12,7 @@ import { useToast } from "@/components/providers/toast-provider"
 import { ThemeToggle } from "@/components/common/theme-toggle"
 import { LanguageToggle } from "@/components/common/language-toggle"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
+import { apiClient } from "@/lib/api"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -24,7 +25,7 @@ export default function LoginPage() {
   const [userId, setUserId] = useState<number | null>(null)
 
   const { login, login2FA } = useAuth()
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { addToast } = useToast()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,38 +36,23 @@ export default function LoginPage() {
       if (show2FA && userId) {
         // Handle 2FA login
         await login2FA(userId, twoFactorCode)
-      addToast({
-        type: "success",
-        title: t("common.success"),
+        addToast({
+          type: "success",
+          title: t("common.success"),
           message: t("auth.loginSuccess"),
-      })
+        })
       } else {
         // Handle initial login
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080"}/login`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email,
-            password,
-          }),
-        })
+        const response: any = await apiClient.login(email, password, undefined, language)
 
-        const data = await response.json()
-
-        if (!response.ok) {
-          throw new Error(data.message || "Login failed")
-        }
-
-        if (data.require_2fa) {
-          setUserId(data.user_id)
-        setShow2FA(true)
-        addToast({
-          type: "info",
-          title: t("auth.twoFactorAuth"),
-          message: t("auth.enterCode"),
-        })
+        if (response.require_2fa) {
+          setUserId(response.user_id)
+          setShow2FA(true)
+          addToast({
+            type: "info",
+            title: t("auth.twoFactorAuth"),
+            message: t("auth.enterCode"),
+          })
           return
         }
 
@@ -79,11 +65,11 @@ export default function LoginPage() {
         })
       }
     } catch (error: any) {
-        addToast({
-          type: "error",
-          title: t("common.error"),
-          message: error.message || "Login failed",
-        })
+      addToast({
+        type: "error",
+        title: t("common.error"),
+        message: error.message || "Login failed",
+      })
     } finally {
       setLoading(false)
     }

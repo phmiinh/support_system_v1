@@ -1,46 +1,57 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState, useEffect } from "react"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { useToast } from "@/hooks/use-toast"
-import { apiClient } from "@/lib/api"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useLanguage } from "@/components/providers/language-provider"
-import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { useToast } from "@/components/providers/toast-provider"
+import { apiClient } from "@/lib/api"
 import { 
   Users, 
   Ticket, 
   Clock, 
-  TrendingUp, 
+  CheckCircle, 
+  TrendingUp,
+  BarChart3,
   Award,
-  CheckCircle,
   AlertCircle,
   XCircle,
   HelpCircle
 } from "lucide-react"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, PieChart, Pie, LineChart, Line, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, AreaChart, Area } from 'recharts'
 
 interface DashboardStats {
   total_tickets: number
   processing_tickets: number
   avg_processing_time: number
   status_distribution: Record<string, number>
+  category_distribution: Record<string, number>
+  product_type_distribution: Record<string, number>
   tickets_this_month: number
   tickets_resolved_this_month: number
-  resolution_rate: number
   top_staff: Array<{
-    StaffID: number
-    Name: string
-    Email: string
-    Count: number
-    AvgTime: number
+    staff_id: number
+    name: string
+    email: string
+    count: number
+    avg_time: number
+  }>
+  resolution_rate: number
+  daily_stats: Array<{
+    date: string
+    new_tickets: number
+    pending_tickets: number
+    resolved_tickets: number
   }>
 }
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
-  const { toast } = useToast()
+  const { addToast } = useToast()
   const { t } = useLanguage()
 
   useEffect(() => {
@@ -51,13 +62,21 @@ export default function AdminDashboardPage() {
     try {
       setLoading(true)
       const response = await apiClient.getAdminDashboardStats()
+      
+      // Sort daily stats by date to ensure correct order
+      if (response.stats.daily_stats) {
+        response.stats.daily_stats.sort((a: any, b: any) => {
+          return new Date(a.date).getTime() - new Date(b.date).getTime()
+        })
+      }
+      
       setStats(response.stats as DashboardStats)
     } catch (error) {
       console.error("Failed to fetch admin stats:", error)
-      toast({
+      addToast({
+        type: "error",
         title: t("error.title"),
-        description: t("error.failedToLoad"),
-        variant: "destructive",
+        message: t("error.failedToLoad"),
       })
     } finally {
       setLoading(false)
@@ -188,101 +207,242 @@ export default function AdminDashboardPage() {
              </CardContent>
            </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t("admin.dashboard.resolutionRate")}</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{(resolutionRate || 0).toFixed(1)}%</div>
-              <p className="text-xs text-muted-foreground">
-                {t("admin.dashboard.allTime")}
-              </p>
-            </CardContent>
-          </Card>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">{t("admin.dashboard.resolutionRate")}</CardTitle>
+                    <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{(resolutionRate || 0).toFixed(1)}%</div>
+                    <p className="text-xs text-muted-foreground">
+                      {t("admin.dashboard.allTime")}
+                    </p>
+                  </CardContent>
+                </Card>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="space-y-1">
+                  <p className="font-medium">{t("admin.dashboard.resolutionRate")}</p>
+                  <p className="text-sm">
+                    {Math.round(stats.total_tickets * (resolutionRate || 0) / 100)} {t("admin.dashboard.resolvedTickets")} / {stats.total_tickets} {t("admin.dashboard.totalTickets")}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {(resolutionRate || 0).toFixed(1)}% {t("admin.dashboard.resolutionRate")}
+                  </p>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
 
-        {/* Status Distribution */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Distribution Sections */}
+        <div className="space-y-6">
+          {/* Status Distribution - Full Width */}
           <Card>
             <CardHeader>
               <CardTitle>{t("admin.dashboard.statusDistribution")}</CardTitle>
               <CardDescription>{t("admin.dashboard.ticketStatusBreakdown")}</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 {Object.entries(stats.status_distribution).map(([status, count]) => (
-                  <div key={status} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
+                  <div key={status} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center space-x-2">
                       <div className={`h-3 w-3 rounded-full ${getStatusColor(status)}`}></div>
                       <span className="text-sm font-medium">{status}</span>
-                      </div>
+                  </div>
                     <Badge variant="secondary">{count}</Badge>
-                    </div>
-                  ))}
-                </div>
-            </CardContent>
-          </Card>
-
-          {/* Top Staff */}
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("admin.dashboard.topStaff")}</CardTitle>
-              <CardDescription>{t("admin.dashboard.allTimeBestPerformers")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {stats.top_staff && stats.top_staff.length > 0 ? (
-                  stats.top_staff.map((staff, index) => (
-                    <div key={staff.StaffID} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
-                          <Award className="h-4 w-4 text-primary" />
                   </div>
-                        <div>
-                          <p className="text-sm font-medium">{staff.Name}</p>
-                          <p className="text-xs text-muted-foreground">{staff.Email}</p>
-                  </div>
-                </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium">{staff.Count} {t("admin.dashboard.tickets")}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {staff.AvgTime ? staff.AvgTime.toFixed(1) : '0.0'}h {t("admin.dashboard.avg")}
-                        </p>
-                  </div>
-                </div>
-                  ))
-                ) : (
-                  <div className="text-center py-4">
-                    <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">{t("admin.dashboard.noStaffData")}</p>
-                  </div>
-                )}
+                ))}
               </div>
             </CardContent>
           </Card>
+
+          {/* Category and Product Type Distribution Charts - 2 Columns */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Category Distribution Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("admin.dashboard.categoryDistribution")}</CardTitle>
+                <CardDescription>{t("admin.dashboard.ticketCategoryBreakdown")}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center space-x-4">
+                  {/* Pie Chart - Left Side - Giảm kích thước */}
+                  <div className="flex-shrink-0">
+                    <ResponsiveContainer width={200} height={200}>
+                      <PieChart>
+                        <Pie
+                          data={Object.entries(stats.category_distribution || {}).map(([name, count]) => ({ name, count }))}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          dataKey="count"
+                          fill="#4086f4"
+                        >
+                          {Object.entries(stats.category_distribution || {}).map(([name, count], index) => (
+                            <Cell key={`cell-${index}`} fill={['#31a952', '#fbbd01', '#eb4132', '#4086f4'][index % 4]} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  
+                  {/* Legend - Right Side - Tăng không gian */}
+                  <div className="flex-1 space-y-2 min-w-0">
+                    {Object.entries(stats.category_distribution || {}).map(([name, count], index) => (
+                      <div key={name} className="flex items-center space-x-2">
+                        <div 
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: ['#31a952', '#fbbd01', '#eb4132', '#4086f4'][index % 4] }}
+                        />
+                        <span className="text-xs font-medium truncate flex-1">{name}</span>
+                        <span className="text-xs text-muted-foreground flex-shrink-0">({count.toLocaleString()})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Product Type Distribution Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("admin.dashboard.productTypeDistribution")}</CardTitle>
+                <CardDescription>{t("admin.dashboard.ticketProductTypeBreakdown")}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                   {Object.entries(stats.product_type_distribution || {}).map(([name, count], index) => (
+                     <div key={name} className="flex items-center space-x-4">
+                       <div className="w-40 text-sm font-medium truncate">{name}</div>
+                       <div className="flex-1">
+                         <div className="relative h-12 bg-gray-200 rounded">
+                           <div 
+                             className="absolute top-0 left-0 h-full bg-green-500 rounded transition-all duration-300"
+                             style={{ 
+                               width: `${(count / 26000) * 100}%`,
+                               backgroundColor: ['#31a952', '#fbbd01', '#eb4132', '#4086f4'][index % 4]
+                             }}
+                             title={`${name}: ${count.toLocaleString()} tickets`}
+                           />
+                           <div className="absolute inset-0 flex items-center justify-end pr-2">
+                             <span className="text-xs font-medium text-white">
+                               {count.toLocaleString()}
+                             </span>
+                           </div>
+                         </div>
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
-        {/* Monthly Stats */}
+        {/* Weekly Stats */}
         <Card>
           <CardHeader>
-            <CardTitle>{t("admin.dashboard.monthlyStats")}</CardTitle>
-            <CardDescription>{t("admin.dashboard.currentMonthPerformance")}</CardDescription>
+            <CardTitle>{t("admin.dashboard.weeklyStats")}</CardTitle>
+            <CardDescription>{t("admin.dashboard.last7DaysPerformance")}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{totalThisMonth}</div>
-                <p className="text-sm text-muted-foreground">{t("admin.dashboard.newTickets")}</p>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{resolvedThisMonth}</div>
-                <p className="text-sm text-muted-foreground">{t("admin.dashboard.resolvedTickets")}</p>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">{stats.processing_tickets}</div>
-                <p className="text-sm text-muted-foreground">{t("admin.dashboard.pendingTickets")}</p>
-              </div>
+            <ResponsiveContainer width="100%" height={350}>
+              <LineChart data={stats.daily_stats && stats.daily_stats.length > 0 ? stats.daily_stats : []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis 
+                  dataKey="date" 
+                  tick={{ fontSize: 12 }}
+                  tickFormatter={(value) => {
+                    const date = new Date(value)
+                    return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+                  }}
+                />
+                <YAxis tick={{ fontSize: 12 }} />
+                <RechartsTooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--background))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '6px'
+                  }}
+                  labelFormatter={(value) => {
+                    const date = new Date(value)
+                    return date.toLocaleDateString('vi-VN', { 
+                      weekday: 'long', 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    })
+                  }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="new_tickets" 
+                  stroke="#3b82f6" 
+                  strokeWidth={4}
+                  dot={{ fill: '#3b82f6', strokeWidth: 3, r: 6 }}
+                  name="Ticket mới"
+                  activeDot={{ r: 8, strokeWidth: 2, stroke: '#3b82f6' }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="pending_tickets" 
+                  stroke="#f59e0b" 
+                  strokeWidth={3}
+                  dot={{ fill: '#f59e0b', strokeWidth: 2, r: 4 }}
+                  name="Ticket chờ xử lý"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="resolved_tickets" 
+                  stroke="#10b981" 
+                  strokeWidth={3}
+                  dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
+                  name="Ticket đã giải quyết"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Top Staff */}
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("admin.dashboard.topStaff")}</CardTitle>
+            <CardDescription>{t("admin.dashboard.allTimeBestPerformers")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {stats.top_staff && stats.top_staff.length > 0 ? (
+                stats.top_staff.map((staff, index) => (
+                  <div key={staff.staff_id} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
+                        <Award className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{staff.name}</p>
+                        <p className="text-xs text-muted-foreground">{staff.email}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium">{staff.count} {t("admin.dashboard.tickets")}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {staff.avg_time ? staff.avg_time.toFixed(1) : '0.0'}h {t("admin.dashboard.avg")}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-4">
+                  <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">{t("admin.dashboard.noStaffData")}</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

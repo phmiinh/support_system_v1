@@ -152,10 +152,10 @@ class ApiClient {
   }
 
   // Auth endpoints
-  async login(email: string, password: string, twoFactorCode?: string) {
+  async login(email: string, password: string, twoFactorCode?: string, language: string = "vi") {
     return this.request("/login", {
       method: "POST",
-      body: JSON.stringify({ email, password, twoFactorCode }),
+      body: JSON.stringify({ email, password, twoFactorCode, language }),
     })
   }
 
@@ -166,17 +166,17 @@ class ApiClient {
     })
   }
 
-  async forgotPassword(email: string) {
+  async forgotPassword(email: string, language: string = "vi") {
     return this.request("/forgot-password", {
       method: "POST",
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, language }),
     })
   }
 
-  async resetPassword(token: string, newPassword: string) {
+  async resetPassword(token: string, newPassword: string, language: string = "vi") {
     return this.request("/reset-password", {
       method: "POST",
-      body: JSON.stringify({ token, newPassword }),
+      body: JSON.stringify({ token, newPassword, language }),
     })
   }
 
@@ -191,6 +191,13 @@ class ApiClient {
     return this.request("/resend-verification-email", {
       method: "POST",
       body: JSON.stringify({ email }),
+    })
+  }
+
+  async verifyResetCode(email: string, code: string, language: string = "vi") {
+    return this.request("/verify-reset-code", {
+      method: "POST",
+      body: JSON.stringify({ email, code, language }),
     })
   }
 
