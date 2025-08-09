@@ -34,7 +34,7 @@ export function EmailVerificationModal({
       addToast({
         type: "error",
         title: t("common.error"),
-        message: "Please enter the verification code",
+        message: t("emailVerification.error"),
       })
       return
     }
@@ -56,13 +56,13 @@ export function EmailVerificationModal({
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || "Verification failed")
+        throw new Error(data.message || t("emailVerification.error"))
       }
 
       addToast({
         type: "success",
         title: t("common.success"),
-        message: "Email verified successfully! You can now login.",
+        message: t("emailVerification.success"),
       })
 
       onVerificationSuccess()
@@ -71,7 +71,7 @@ export function EmailVerificationModal({
       addToast({
         type: "error",
         title: t("common.error"),
-        message: error.message || "Verification failed",
+        message: error.message || t("emailVerification.error"),
       })
     } finally {
       setLoading(false)
@@ -95,19 +95,19 @@ export function EmailVerificationModal({
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || "Failed to resend code")
+        throw new Error(data.message || t("emailVerification.resendError"))
       }
 
       addToast({
         type: "success",
         title: t("common.success"),
-        message: "Verification code has been resent to your email",
+        message: t("emailVerification.resendSuccess"),
       })
     } catch (error: any) {
       addToast({
         type: "error",
         title: t("common.error"),
-        message: error.message || "Failed to resend code",
+        message: error.message || t("emailVerification.resendError"),
       })
     } finally {
       setResendLoading(false)
@@ -123,22 +123,22 @@ export function EmailVerificationModal({
           <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
             <Mail className="w-6 h-6 text-primary" />
           </div>
-          <CardTitle className="text-xl font-semibold">Verify Your Email</CardTitle>
+          <CardTitle className="text-xl font-semibold">{t("emailVerification.title")}</CardTitle>
           <CardDescription>
-            We've sent a verification code to <strong>{email}</strong>
+            {t("emailVerification.description")} <strong>{email}</strong>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="verificationCode" className="text-sm font-medium">
-              Verification Code
+              {t("auth.enterCode")}
             </label>
             <Input
               id="verificationCode"
               type="text"
               value={verificationCode}
               onChange={(e) => setVerificationCode(e.target.value)}
-              placeholder="Enter 6-digit code"
+              placeholder={t("emailVerification.codePlaceholder")}
               maxLength={6}
               className="text-center text-lg tracking-widest"
             />
@@ -151,7 +151,7 @@ export function EmailVerificationModal({
               disabled={loading || !verificationCode.trim()}
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Verify Email
+              {loading ? t("emailVerification.loading") : t("emailVerification.verify")}
             </Button>
 
             <Button
@@ -162,7 +162,7 @@ export function EmailVerificationModal({
             >
               {resendLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {!resendLoading && <RefreshCw className="mr-2 h-4 w-4" />}
-              Resend Code
+              {resendLoading ? t("emailVerification.resending") : t("emailVerification.resend")}
             </Button>
 
             <Button
@@ -171,13 +171,13 @@ export function EmailVerificationModal({
               className="w-full"
               disabled={loading}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
 
           <div className="text-center text-sm text-muted-foreground">
-            <p>Didn't receive the code? Check your spam folder or</p>
-            <p>make sure the email address is correct.</p>
+            <p>{t("emailVerification.checkSpam")}</p>
+            <p>{t("emailVerification.checkEmail")}</p>
           </div>
         </CardContent>
       </Card>

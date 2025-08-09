@@ -72,9 +72,9 @@ func AdminDashboardStats(c *fiber.Ctx) error {
 		statusArgs = []interface{}{user.ID}
 	} else {
 		statusQuery = `
-			SELECT status, COUNT(*) as count 
-			FROM tickets 
-			GROUP BY status
+		SELECT status, COUNT(*) as count 
+		FROM tickets 
+		GROUP BY status
 		`
 	}
 
@@ -86,6 +86,80 @@ func AdminDashboardStats(c *fiber.Ctx) error {
 		var count int
 		rows.Scan(&status, &count)
 		statusStats[status] = count
+	}
+
+	// Thống kê phân bố theo category
+	categoryStats := fiber.Map{}
+	var categoryQuery string
+	var categoryArgs []interface{}
+
+	if userRole == "staff" {
+		categoryQuery = `
+			SELECT 
+				COALESCE(ticket_categories.name, 'Không phân loại') as category_name,
+				COUNT(*) as count 
+			FROM tickets 
+			LEFT JOIN ticket_categories ON tickets.category_id = ticket_categories.id
+			WHERE tickets.assigned_to = ?
+			GROUP BY ticket_categories.name
+		`
+		categoryArgs = []interface{}{user.ID}
+	} else {
+		categoryQuery = `
+			SELECT 
+				COALESCE(ticket_categories.name, 'Không phân loại') as category_name,
+				COUNT(*) as count 
+			FROM tickets 
+			LEFT JOIN ticket_categories ON tickets.category_id = ticket_categories.id
+			GROUP BY ticket_categories.name
+		`
+	}
+
+	categoryRows, _ := models.DB.Raw(categoryQuery, categoryArgs...).Rows()
+	defer categoryRows.Close()
+
+	for categoryRows.Next() {
+		var categoryName string
+		var count int
+		categoryRows.Scan(&categoryName, &count)
+		categoryStats[categoryName] = count
+	}
+
+	// Thống kê phân bố theo product_type
+	productTypeStats := fiber.Map{}
+	var productTypeQuery string
+	var productTypeArgs []interface{}
+
+	if userRole == "staff" {
+		productTypeQuery = `
+			SELECT 
+				COALESCE(ticket_product_types.name, 'Không phân loại') as product_type_name,
+				COUNT(*) as count 
+			FROM tickets 
+			LEFT JOIN ticket_product_types ON tickets.product_type_id = ticket_product_types.id
+			WHERE tickets.assigned_to = ?
+			GROUP BY ticket_product_types.name
+		`
+		productTypeArgs = []interface{}{user.ID}
+	} else {
+		productTypeQuery = `
+			SELECT 
+				COALESCE(ticket_product_types.name, 'Không phân loại') as product_type_name,
+				COUNT(*) as count 
+			FROM tickets 
+			LEFT JOIN ticket_product_types ON tickets.product_type_id = ticket_product_types.id
+			GROUP BY ticket_product_types.name
+		`
+	}
+
+	productTypeRows, _ := models.DB.Raw(productTypeQuery, productTypeArgs...).Rows()
+	defer productTypeRows.Close()
+
+	for productTypeRows.Next() {
+		var productTypeName string
+		var count int
+		productTypeRows.Scan(&productTypeName, &count)
+		productTypeStats[productTypeName] = count
 	}
 
 	// Thống kê số ticket đã nhận trong tháng
@@ -109,11 +183,11 @@ func AdminDashboardStats(c *fiber.Ctx) error {
 
 	// Thống kê nhân viên xuất sắc (xử lý nhiều nhất all time)
 	type StaffStat struct {
-		StaffID uint
-		Name    string
-		Email   string
-		Count   int
-		AvgTime float64
+		StaffID uint    `json:"staff_id"`
+		Name    string  `json:"name"`
+		Email   string  `json:"email"`
+		Count   int     `json:"count"`
+		AvgTime float64 `json:"avg_time"`
 	}
 	var staffStats []StaffStat
 
@@ -158,8 +232,8 @@ func AdminDashboardStats(c *fiber.Ctx) error {
 			LEFT JOIN tickets ON users.id = tickets.assigned_to 
 			WHERE users.role IN ('admin', 'staff')
 			GROUP BY users.id, users.name, users.email
-			ORDER BY count DESC, avg_time ASC
-			LIMIT 5
+		ORDER BY count DESC, avg_time ASC
+		LIMIT 5
 		`
 	}
 
@@ -167,7 +241,7 @@ func AdminDashboardStats(c *fiber.Ctx) error {
 
 	// Tính tỷ lệ giải quyết all time
 	var totalResolvedTickets int64
-	resolutionQuery := models.DB.Model(&models.Ticket{}).Where("status = 'Đã xử lý'")
+	resolutionQuery := models.DB.Model(&models.Ticket{}).Where("status IN (?, ?)", "Đã xử lý", "Đã đóng")
 	if userRole == "staff" {
 		resolutionQuery = resolutionQuery.Where("assigned_to = ?", user.ID)
 	}
@@ -178,6 +252,56 @@ func AdminDashboardStats(c *fiber.Ctx) error {
 		resolutionRate = (float64(totalResolvedTickets) / float64(totalTickets)) * 100
 	}
 
+	// Thống kê 7 ngày gần nhất theo trạng thái
+	type DailyStats struct {
+		Date            string `json:"date"`
+		NewTickets      int    `json:"new_tickets"`
+		PendingTickets  int    `json:"pending_tickets"`
+		ResolvedTickets int    `json:"resolved_tickets"`
+	}
+
+	var dailyStats []DailyStats
+	currentTime := time.Now()
+
+	for i := 6; i >= 0; i-- {
+		currentDate := currentTime.AddDate(0, 0, -i)
+		dateStr := currentDate.Format("2006-01-02")
+		startOfDay := time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), 0, 0, 0, 0, currentDate.Location())
+		endOfDay := startOfDay.Add(24 * time.Hour)
+
+		var newTicketsCount int64
+		var pendingTicketsCount int64
+		var resolvedTicketsCount int64
+
+		// New tickets - đếm tickets được tạo trong ngày
+		newQuery := models.DB.Model(&models.Ticket{}).Where("created_at >= ? AND created_at < ?", startOfDay, endOfDay)
+		if userRole == "staff" {
+			newQuery = newQuery.Where("assigned_to = ?", user.ID)
+		}
+		newQuery.Count(&newTicketsCount)
+
+		// Pending tickets - đếm tickets có trạng thái pending hiện tại
+		pendingQuery := models.DB.Model(&models.Ticket{}).Where("status IN (?, ?)", "Đang xử lý", "Chờ phản hồi")
+		if userRole == "staff" {
+			pendingQuery = pendingQuery.Where("assigned_to = ?", user.ID)
+		}
+		pendingQuery.Count(&pendingTicketsCount)
+
+		// Resolved tickets - đếm tickets được resolved trong ngày
+		resolvedQuery := models.DB.Model(&models.Ticket{}).Where("resolved_at >= ? AND resolved_at < ?", startOfDay, endOfDay)
+		if userRole == "staff" {
+			resolvedQuery = resolvedQuery.Where("assigned_to = ?", user.ID)
+		}
+		resolvedQuery.Count(&resolvedTicketsCount)
+
+		dailyStats = append(dailyStats, DailyStats{
+			Date:            dateStr,
+			NewTickets:      int(newTicketsCount),
+			PendingTickets:  int(pendingTicketsCount),
+			ResolvedTickets: int(resolvedTicketsCount),
+		})
+	}
+
 	return c.JSON(fiber.Map{
 		"success": true,
 		"stats": fiber.Map{
@@ -185,10 +309,13 @@ func AdminDashboardStats(c *fiber.Ctx) error {
 			"processing_tickets":          processingTickets,
 			"avg_processing_time":         avgProcessingTime,
 			"status_distribution":         statusStats,
+			"category_distribution":       categoryStats,
+			"product_type_distribution":   productTypeStats,
 			"tickets_this_month":          ticketsThisMonth,
 			"tickets_resolved_this_month": ticketsResolvedThisMonth,
 			"top_staff":                   staffStats,
 			"resolution_rate":             resolutionRate,
+			"daily_stats":                 dailyStats,
 		},
 	})
 }

@@ -12,7 +12,7 @@ import { useToast } from "@/components/providers/toast-provider"
 import { ThemeToggle } from "@/components/common/theme-toggle"
 import { LanguageToggle } from "@/components/common/language-toggle"
 import { apiClient } from "@/lib/api"
-import { Eye, EyeOff, Loader2, ArrowLeft } from "lucide-react"
+import { Eye, EyeOff, Loader2, ArrowLeft, Lock } from "lucide-react"
 
 export default function ResetPasswordPage() {
   const [newPassword, setNewPassword] = useState("")
@@ -22,20 +22,22 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [token, setToken] = useState("")
 
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { addToast } = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
 
   useEffect(() => {
     const tokenParam = searchParams.get("token")
-    if (tokenParam) {
+    const emailParam = searchParams.get("email")
+    
+    if (tokenParam && emailParam) {
       setToken(tokenParam)
     } else {
       addToast({
         type: "error",
         title: t("common.error"),
-        message: "Invalid reset token",
+        message: t("auth.invalidResetToken"),
       })
       router.push("/login")
     }
@@ -48,16 +50,16 @@ export default function ResetPasswordPage() {
       addToast({
         type: "error",
         title: t("common.error"),
-        message: "Passwords do not match",
+        message: t("auth.passwordsDoNotMatch"),
       })
       return
     }
 
-    if (newPassword.length < 6) {
+    if (newPassword.length < 8) {
       addToast({
         type: "error",
         title: t("common.error"),
-        message: "Password must be at least 6 characters",
+        message: t("auth.passwordTooShort"),
       })
       return
     }
@@ -65,18 +67,18 @@ export default function ResetPasswordPage() {
     setLoading(true)
 
     try {
-      await apiClient.resetPassword(token, newPassword)
+      await apiClient.resetPassword(token, newPassword, language)
       addToast({
         type: "success",
         title: t("common.success"),
-        message: "Password reset successful! You can now login with your new password.",
+        message: t("auth.passwordResetSuccess"),
       })
       router.push("/login")
     } catch (error: any) {
       addToast({
         type: "error",
         title: t("common.error"),
-        message: error.message || "Failed to reset password",
+        message: error.message || t("auth.passwordResetError"),
       })
     } finally {
       setLoading(false)
@@ -93,7 +95,7 @@ export default function ResetPasswordPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">{t("auth.resetPassword")}</CardTitle>
-          <CardDescription className="text-center">Enter your new password</CardDescription>
+          <CardDescription className="text-center">{t("auth.enterNewPassword")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -109,8 +111,8 @@ export default function ResetPasswordPage() {
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
                   disabled={loading}
-                  placeholder="Enter your new password"
-                  minLength={6}
+                  placeholder={t("auth.newPasswordPlaceholder")}
+                  minLength={8}
                 />
                 <button
                   type="button"
@@ -134,8 +136,8 @@ export default function ResetPasswordPage() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   disabled={loading}
-                  placeholder="Confirm your new password"
-                  minLength={6}
+                  placeholder={t("auth.confirmPasswordPlaceholder")}
+                  minLength={8}
                 />
                 <button
                   type="button"
@@ -149,14 +151,14 @@ export default function ResetPasswordPage() {
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Reset Password
+              {t("auth.resetPassword")}
             </Button>
           </form>
 
           <div className="mt-6 text-center">
             <Link href="/login" className="inline-flex items-center text-sm text-primary hover:underline">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to login
+              {t("auth.backToLogin")}
             </Link>
           </div>
         </CardContent>

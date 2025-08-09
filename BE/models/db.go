@@ -33,4 +33,32 @@ func ConnectDatabase() {
 	database.AutoMigrate(&TicketPriority{})
 
 	DB = database
+
+	// Tạo các composite index cần thiết cho tối ưu hiệu suất
+	createOptimizationIndexes()
+}
+
+func createOptimizationIndexes() {
+	// Composite index cho query thống kê theo assigned_to và status
+	DB.Exec("CREATE INDEX IF NOT EXISTS idx_tickets_assigned_status ON tickets(assigned_to, status)")
+
+	// Composite index cho query thống kê theo assigned_to và created_at
+	DB.Exec("CREATE INDEX IF NOT EXISTS idx_tickets_assigned_created ON tickets(assigned_to, created_at)")
+
+	// Composite index cho query thống kê theo assigned_to và resolved_at
+	DB.Exec("CREATE INDEX IF NOT EXISTS idx_tickets_assigned_resolved ON tickets(assigned_to, resolved_at)")
+
+	// Composite index cho query thống kê theo status và created_at
+	DB.Exec("CREATE INDEX IF NOT EXISTS idx_tickets_status_created ON tickets(status, created_at)")
+
+	// Composite index cho query thống kê theo assigned_to, status và created_at
+	DB.Exec("CREATE INDEX IF NOT EXISTS idx_tickets_assigned_status_created ON tickets(assigned_to, status, created_at)")
+
+	// Composite index cho query thống kê theo category_id và assigned_to
+	DB.Exec("CREATE INDEX IF NOT EXISTS idx_tickets_category_assigned ON tickets(category_id, assigned_to)")
+
+	// Composite index cho query thống kê theo product_type_id và assigned_to
+	DB.Exec("CREATE INDEX IF NOT EXISTS idx_tickets_product_assigned ON tickets(product_type_id, assigned_to)")
+
+	log.Println("Database indexes created successfully")
 }

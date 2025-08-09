@@ -984,7 +984,9 @@ func CheckAndSendLateTicketReminders() {
 	now := time.Now()
 	// Lấy các ticket chưa được phản hồi quá 24h (chỉ lấy ticket chưa đóng)
 	db.Where("status != ? AND TIMESTAMPDIFF(HOUR, updated_at, ?) >= 24", "Đã đóng", now).Find(&tickets)
-	for _, t := range tickets {
+	var tk []models.Ticket
+	tk = append(tk, tickets[0])
+	for _, t := range tk {
 		// Gửi cho staff được assigned hoặc cho tất cả admin nếu chưa assigned
 		if t.AssignedTo != nil {
 			var staff models.User
@@ -998,6 +1000,7 @@ func CheckAndSendLateTicketReminders() {
 						fmt.Printf("[MAIL ERROR] To: %s | Subject: %s | Error: %v\n", staff.Email, subject, err)
 					}
 				}()
+				time.Sleep(5 * time.Second)
 			}
 		} else {
 			var admins []models.User
@@ -1012,6 +1015,7 @@ func CheckAndSendLateTicketReminders() {
 							fmt.Printf("[MAIL ERROR] To: %s | Subject: %s | Error: %v\n", admin.Email, subject, err)
 						}
 					}()
+					time.Sleep(5 * time.Second)
 				}
 			}
 		}

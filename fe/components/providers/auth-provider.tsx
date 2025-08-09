@@ -18,7 +18,7 @@ type AuthContextType = {
   user: User | null
   login: (email: string, password: string, twoFactorCode?: string) => Promise<void>
   login2FA: (userId: number, code: string) => Promise<void>
-  register: (fullName: string, email: string, password: string, phone: string) => Promise<void>
+  register: (formData: FormData) => Promise<void>
   logout: () => void
   loading: boolean
   refreshToken: () => Promise<void>
@@ -205,19 +205,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const register = async (fullName: string, email: string, password: string, phone: string) => {
+  const register = async (formData: FormData) => {
     try {
       const response = await fetch(`${API_BASE_URL}/register`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: fullName, // Backend expects 'name' field
-          email,
-          password,
-          phone, // Backend expects 'phone' field
-        }),
+        body: formData,
       })
 
       const data = await response.json()
